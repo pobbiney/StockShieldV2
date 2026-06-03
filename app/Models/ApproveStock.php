@@ -19,4 +19,6 @@ class ApproveStock extends Model
     'status',
     'created_by',
 ];
+
+ 
 }

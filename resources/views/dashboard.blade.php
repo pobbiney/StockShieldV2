@@ -107,7 +107,7 @@
                                         <!-- Swiper daily quote -->
                                         <div class="swiper mt-4 swipernav">
                                             <div class="swiper-wrapper">
-                                                <div class="swiper-slide">
+                                                {{-- <div class="swiper-slide">
                                                     <div class="row gx-3 gx-xl-4">
                                                         <div class="col-auto">
                                                             <i class="bi bi-cake fs-5 avatar avatar-50 rounded-circle bg-theme-1-subtle text-theme-1 theme-pink"></i>
@@ -124,18 +124,36 @@
                                                             <p class="text-secondary">Your 5 partner and our CEO's <span class="fw-bold">birthday</span> today.</p>
                                                         </div>
                                                     </div>
-                                                </div>
+                                                </div> --}}
+                                                 @foreach($reorderItems as $item)
+
+                                                 @if($item->total_qty  == $item->reorder_level)
                                                 <div class="swiper-slide">
                                                     <div class="row gx-3 gx-xl-4">
                                                         <div class="col-auto">
                                                             <i class="bi bi-quote fs-4 avatar avatar-50 rounded-circle bg-theme-1-subtle text-theme-1 theme-grey"></i>
                                                         </div>
                                                         <div class="col">
-                                                            <h5 class="mb-1">Winners don't do different things, they do things differently</h5>
-                                                            <p class="text-secondary">Shiv Khera - You Can Win: A Step by Step Tool for Top Achievers</p>
+                                                            <h5 class="mb-1">{{ $item->name }}</h5>
+                                                            <p class="text-secondary">reached re-order level please re-stock to continue issuing</p>
                                                         </div>
                                                     </div>
                                                 </div>
+                                                @elseif($item->total_qty  < $item->reorder_level)
+                                                <div class="swiper-slide">
+                                                    <div class="row gx-3 gx-xl-4">
+                                                        <div class="col-auto">
+                                                            <i class="bi bi-quote fs-4 avatar avatar-50 rounded-circle bg-theme-1-subtle text-theme-1 theme-grey"></i>
+                                                        </div>
+                                                        <div class="col">
+                                                            <h5 class="mb-1">{{ $item->name }}</h5>
+                                                            <p class="text-secondary">is below re-order level please   re-stock to continue issuing</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                 @endif
+
+                                                @endforeach
                                             </div>
                                         </div>
                                     </div>
@@ -159,7 +177,7 @@
                                                 <p class="small text-secondary text-truncated">Tasks Done</p>
                                             </div>
                                         </div>
-                                        <div class="row gx-3 gx-lg-4 align-items-center mb-3 mb-lg-4">
+                                        {{-- <div class="row gx-3 gx-lg-4 align-items-center mb-3 mb-lg-4">
                                             <div class="col-auto">
                                                 <i class="bi bi-star h5 avatar avatar-50 bg-theme-1 text-white theme-yellow rounded-circle"></i>
                                             </div>
@@ -170,7 +188,7 @@
                                                 </div>
                                                 <p class="text-secondary small"><a href="https://www.adminuiux.com/adminuiux/adminux/html/profile-settings.html" class="style-none">Complete your profile</a></p>
                                             </div>
-                                        </div>
+                                        </div> --}}
                                     </div>
 
                                     <!-- Tips swiper message -->

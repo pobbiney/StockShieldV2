@@ -171,5 +171,7 @@ Route::get('/received-stock-byitemDate-print',[ReportController::class, 'printRe
 
 Route::get('IssuedItemsReport',[ReportController::class,'getIssuedItemsReportView'])->name('IssuedItemsReport');
 Route::get('ReOrderLevelReport',[ReportController::class,'getIssuedItemsReportView'])->name('ReOrderLevelReport');
+Route::post('ReOrderLevelReport',[ReportController::class,'searchStockLevelReport'])->name('report.stockreorderlevel-report');
+Route::get('/reorderlevel-stock-print/{department}', [ReportController::class, 'printReoderlevelStockReport']) ->middleware('auth')->name('report.reorderlevel-stock-print');
 
 /* End of Report */

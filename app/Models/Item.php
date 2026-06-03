@@ -30,8 +30,8 @@ class Item extends Model
 	}
     public function approveStock()
 	{
-		return $this->hasMany(ApproveStock::class, 'item_id');
+		return $this->hasMany(ApproveStock::class, 'item_id','id');
 	}
-
+ 
 	 
 }
