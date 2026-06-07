@@ -43,20 +43,11 @@
             <div class="card-header">
                 <div class="row gx-3 gx-lg-4 align-items-center">
                     <div class="col">
-                        <p class="h6">Received  Items Report </p>
+                        <p class="h6">Issued  Items Report </p>
                     </div>
                     <div class="col-auto">
-                          <a href="{{ route('ReceivedStocks') }}" class="btn btn-primary"  >
-                               <i class="bi bi-house"></i> Search By Store
-                            </a>
-                        <a href="{{ route('ReceivedStockByDate') }}" class="btn btn-info"  >
-                               <i class="bi bi-calendar-date"></i> Search By Date
-                            </a>
-                            <a href="{{ route('searchByItem') }}" class="btn btn-success"   >
-                               <i class="bi bi-box-arrow-right"></i> Search By Item
-                            </a>
-                            <a href="{{ route('searchByItemDate') }}" class="btn btn-warning"   >
-                               <i class="bi bi-calendar-date"></i> Search   Item By Date Intervals
+                          <a href="{{ route('IssuedItemsReport') }}" class="btn btn-danger"  >
+                               <i class="bi bi-back"></i> Back
                             </a>
                     </div>
                 </div>
@@ -75,27 +66,10 @@
                                 </div>
                             @endif
                         @endif
-                        <form id="form" enctype="multipart/form-data" method="POST" action="{{ route('report.stockreceivedbyitemDate-report') }}">
+                        <form id="form" enctype="multipart/form-data" method="POST" action="{{ route('report.searchbyIssueItemRep-report') }}">
                             @csrf
                             <div class="row">
-                                  <div class="col-md-3">
-                                    <div class="form-group mb-3 position-relative check-valid">
-                                        <div class="form-floating">
-                                            <input type="text" class="form-control datepicker1"     name="start_date" placeholder="Enter Start Date">
-                                            <label>Start Date</label>
-                                             @error('department') <small style="color:red"> {{ $message}}</small> @enderror
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="form-group mb-3 position-relative check-valid">
-                                        <div class="form-floating">
-                                            <input type="text" class="form-control datepicker2"     name="end_date" placeholder="Enter End Date">
-                                            <label>End Date</label>
-                                             @error('end_date') <small style="color:red"> {{ $message}}</small> @enderror
-                                        </div>
-                                    </div>
-                                </div>
+                                <div class="col-md-2"></div>
                                 <div class="col-md-3">
                                     <select class="js-example-basic-single form-control" name="item"  >
                                         <option value="" selected disabled>--Select Item--</option>
@@ -105,6 +79,20 @@
                                     </select>
                                     
                                     @error('item') <small style="color:red"> {{ $message}}</small> @enderror 
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group mb-3 position-relative check-valid">
+                                        <div class="form-floating">
+                                            <select class="form-control " name="department">
+                                                    <option value="" selected disabled>--Select Store--</option>
+                                            @foreach ($liststores as $cat)
+                                            <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                                            @endforeach
+                                            
+                                            </select>
+                                            @error('department') <small style="color:red"> {{ $message}}</small> @enderror
+                                        </div>
+                                    </div>
                                 </div>
                               
                                  
@@ -116,34 +104,33 @@
                         <hr/>
 
                         @if(isset($liststock) && $liststock->count() > 0)
-                          <a href="{{ route('report.received-stock-byitemDate-print',['item' => request()->item,'start_date' => request()->start_date ,'end_date' => request()->end_date]) }}" target="_blank" class="btn btn-primary" style=" margin-bottom:10px"><i class="bi bi-printer"></i> Print</a>
+                          <a href="{{ route('report.issueditem-print',['department' => request()->department,'item' => request()->item ]) }}" target="_blank" class="btn btn-primary" style=" margin-bottom:10px"><i class="bi bi-printer"></i> Print</a>
                           <div class="table-responsive">
                             
                                 <table  class="table table-bordered "  >
                                     <thead>
-                                        <tr class="bg-l-gradient-light theme-green">
-                                          
+                                         <tr>
                                             <th>ID</th>
+                                            <th>Item Code</th>
+                                            <th >Item Name</th>
+                                            <th>UoM</th>
+                                             
+                                            <th >Issuing Store </th>
+                                            <th >Receiving Store </th>
                                             
-                                            <th>ITEM CODE</th>
-                                            <th >ITEM NAME</th>
-                                            <th>Uom</th>
-                                            <th>BATCH NO</th>
-                                            <th>VENDOR</th>
-                                            <th>PO</th>
-                                            <th>WAYBILL</th>
-                                            <th>EXPIRY DATE</th>
-                                            <th>CONTRACT REF.</th>
-                                            <th>RECEIVED BY</th>
-                                            <th>UNIT COST</th>
-                                            <th>QTY</th>
                                             
-                                            <th>TOTAL AMOUNT</th>
+                                            <th>Invoice No</th>
+                                            <th>Issued By</th>
+                                            <th>Date of Issue</th>
+                                            <th>Qty</th>
+                                            <th>Unit Cost</th>
+                                            <th>Amount</th>
                                             
+                                                
                                         </tr>
                                     </thead>
                                     <tbody>
-                                            
+                                          
                                              @php  $grandTotal = 0; $totalqty = 0; @endphp
                                             @foreach($liststock as $lists)
                                             
@@ -154,35 +141,39 @@
                                                 $totalqty += $lists->qty;
                                             @endphp
                                             <tr>
-                                                <td>{{ $loop->iteration }}</td>
-                                                <td>{{ $lists->itemname->item_code }}</td>
-                                                <td>{{ $lists->itemname->name }}</td>
-                                                <td>{{ $lists->itemname->unitname->name ?? ''}}</td>
-                                                <td>{{ $lists->batch_number ?? '' }}</td>
+                                                <td>{{ $loop->iteration}}</td>
+                                                <td> {{ $lists->itemname->item_code }}</td>
+                                                <td>{{ $lists->itemname->name}}</td>
+                                                <td>{{ $lists->itemname->unitname->name}}</td>
+                                               
+                                                <td>{{ $lists->issuefrom->name}}</td>
+                                                <td>{{ $lists->storename->name}}</td>
                                                 
-                                                <td>{{ $lists->supname->company ?? '' }}</td>
-                                                <td>{{ $lists->purchase_order ?? ''}} </td>
-                                                <td>{{ $lists->waybill }}</td>
-                                                <td>{{ $lists->expiry_date }}</td>
-                                                <td>{{ $lists->award_letter }}</td>
-                                                <td>{{ $lists->staffname->name }}</td>
-                                                <td>{{ $lists->amount ?? ''}}</td>
-                                                <td>{{ $lists->qty ?? ''}} </td>
+                                                <td>{{ $lists->invoice_number}}</td>
+                                                <td>{{ $lists->staffname->name}}</td>
+                                                <td>{{ Carbon\Carbon::parse($lists->created_at)->format('F jS, Y \a\t h:i A') }} </td>
+                                                <td><b>{{ $lists->qty}}</b></td>
+                                                <td><b>{{ $lists->amount}}</b></td>
+                                                <td><b>{{ number_format($lineTotal,2)}}</b></td>
                                                 
-                                                <td>{{ number_format($lineTotal,2)}}</td>
+                                        
+                                               
+                                                  
                                             </tr>
+                                             
+                                          
                                             @endforeach
                                             <tr>
-                                                <td colspan="11"><b style="float: right">TOTAL</b></td>
-                                                <td></td>
+                                                <td colspan="9"><b style="float: right">TOTAL</b></td>
                                                 <td><b>{{ $totalqty }}</b></td>
+                                                <td><b></b></td>
                                                 
                                                 <td><b>{{ number_format($grandTotal,2)}}</b></td>
                                             </tr>
+                                           
                                             
                                     </tbody>
                                 </table>
-                             
                                    
                             </div>
                             

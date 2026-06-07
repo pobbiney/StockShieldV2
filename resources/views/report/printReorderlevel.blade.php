@@ -481,7 +481,7 @@ tfoot td {
       </div>
     </div>
     <div class="report-title-block">
-      <div class="report-title">Received Items Report</div>
+      <div class="report-title">Re-order Level Report</div>
       <div class="report-sub">Central   Stores Department</div>
     </div>
   </div>

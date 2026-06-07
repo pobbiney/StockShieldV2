@@ -170,8 +170,31 @@ Route::post('searchByItemDate',[ReportController::class,'searchReceivedStockByIt
 Route::get('/received-stock-byitemDate-print',[ReportController::class, 'printReceivedStockByItemDateReport'])->middleware('auth')  ->name('report.received-stock-byitemDate-print');
 
 Route::get('IssuedItemsReport',[ReportController::class,'getIssuedItemsReportView'])->name('IssuedItemsReport');
-Route::get('ReOrderLevelReport',[ReportController::class,'getIssuedItemsReportView'])->name('ReOrderLevelReport');
+Route::get('ReOrderLevelReport',[ReportController::class,'getReorderLevelReportView'])->name('ReOrderLevelReport');
 Route::post('ReOrderLevelReport',[ReportController::class,'searchStockLevelReport'])->name('report.stockreorderlevel-report');
 Route::get('/reorderlevel-stock-print/{department}', [ReportController::class, 'printReoderlevelStockReport']) ->middleware('auth')->name('report.reorderlevel-stock-print');
+
+Route::post('IssuedItemsReport',[ReportController::class,'getIssuedItemsReportView'])->name('IssuedItemsReport');
+Route::post('searchIssueItemByStore',[ReportController::class,'searchIssuedStoreReport'])->name('report.issueditem-report');
+Route::get('/issueditem-stock-report/{department}', [ReportController::class, 'printIssuedItemReport']) ->middleware('auth')->name('report.issueditem-stock-print');
+ 
+Route::get('searchIssueItemByStore',[ReportController::class,'getsearchIssueItemByStoreView'])->name('searchIssueItemByStore');
+
+Route::get('searchByIssueItem',[ReportController::class,'getsearchByIssueItemView'])->name('searchByIssueItem');
+Route::post('searchByIssueItem',[ReportController::class,'searchIssuedItemReport'])->name('report.searchbyIssueItemRep-report');
+Route::get('/issueditem-print/{department}', [ReportController::class, 'printIssuedByItemReport']) ->middleware('auth')->name('report.issueditem-print');
+
+Route::get('searchByIssuedDate',[ReportController::class,'getsearchByIssuedDateView'])->name('searchByIssuedDate');
+Route::post('searchByIssuedDate',[ReportController::class,'searchByIssuedDate'])->name('report.searchByIssuedDate-report');
+Route::get('/issued-item-date-print',
+    [ReportController::class, 'printIssuedItemDateReport'])
+    ->middleware('auth')  ->name('report.issued-item-date-print');
+
+    Route::get('searchIssuedItemByDateIntev',[ReportController::class,'getsearchIssuedItemByDateIntevView'])->name('searchIssuedItemByDateIntev');
+
+    Route::post('searchIssuedItemByDateIntev',[ReportController::class,'searchIssuedItemByDateIntev'])->name('report.searchIssuedItemByDateIntev-report');
+    Route::get('/issued-item-byitemDate-print',
+    [ReportController::class, 'printIssuedItemDateIntervalReport'])
+    ->middleware('auth')  ->name('report.issued-item-byitemDate-print');
 
 /* End of Report */

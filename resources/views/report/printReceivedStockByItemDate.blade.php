@@ -564,7 +564,7 @@ tfoot td {
             <th>PO</th>
             <th>WAYBILL</th>
             <th>EXPIRY DATE</th>
-             <th>CONTACT NO. </th> 
+             <th>CONTRACT NO. </th> 
         
             {{-- <th>RECEIVED BY</th> --}}
             <th>UNIT COST</th>

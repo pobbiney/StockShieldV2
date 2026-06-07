@@ -46,6 +46,9 @@
                         <p class="h6">Received  Items Report </p>
                     </div>
                     <div class="col-auto">
+                          <a href="{{ route('ReceivedStocks') }}" class="btn btn-primary"  >
+                               <i class="bi bi-house"></i> Search By Store
+                            </a>
                         <a href="{{ route('ReceivedStockByDate') }}" class="btn btn-info"  >
                                <i class="bi bi-calendar-date"></i> Search By Date
                             </a>

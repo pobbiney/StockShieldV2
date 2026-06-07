@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Report;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
+use App\Models\ItemIssue;
 use App\Models\Stock;
 use App\Models\Store;
 use Illuminate\Http\Request;
@@ -363,7 +364,7 @@ class ReportController extends Controller
     );
     }
 
-     public function getIssuedItemsReportView()
+     public function getReorderLevelReportView()
     {
         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
         $liststores = Store::whereIn('id', $listdept)->get();  
@@ -472,5 +473,347 @@ public function searchStockLevelReport(Request $request)
         compact('liststock', 'store')
     );
     }
+
+      public function getIssuedItemsReportView()
+    {
+        $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
+        $liststores = Store::whereIn('id', $listdept)->get();  
+         
+        return view('report.IssuedItemsReport',['liststores'=>$liststores]);
+    }
+
+     public function searchIssuedStoreReport(Request $request)
+    {
+          
+        $request->validate([
+            'department' => 'required',
+         
+        ]);
+
+       
+        // All stores
+         $liststores = Store::all();
+        
+         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
+         $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()
+
+       $liststock = ItemIssue::where('store_id', $request->department)
+      
+    ->where(function($query) {
+        $query->where('status', 'issued');
+            
+    })
+    ->orderBy('invoice_number')
+    ->get();
+        if ($liststock->count() > 0) {
+
+            return view(
+                'report.searchIssueItemByStore',
+                compact('liststock', 'liststores' ,  'getItemid')
+            )->with(
+                'message_success',
+                $liststock->count().' Items(s) found'
+            );
+
+        } else {
+
+            return view(
+                'report.searchIssueItemByStore',
+                compact('liststock', 'liststores','getItemid')
+            )->with(
+                'message_error',
+                'No Items found'
+            );
+        }
+    }
+
+
+      public function printIssuedItemReport(Request $request)
+    {
+          
+       
+        // All stores
+         $liststores = Store::all();
+        
+         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
+         $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()R
+
+       $liststock = ItemIssue::where('store_id', $request->department)
+      
+    ->where(function($query) {
+        $query->where('status', 'issued');
+            
+    })
+    ->orderBy('invoice_number')
+    ->get();
+    $store = Store::find($request->department);
+        return view(
+        'report.printIssuedItemReport',
+        compact('liststock', 'liststores','getItemid','store')
+    );
+    }
+
+    public function getsearchIssueItemByStoreView()
+    {
+         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
+        $liststores = Store::whereIn('id', $listdept)->get();  
+        return view('report.searchIssueItemByStore',['liststores'=>$liststores]);
+    }
+
+     public function getsearchByIssueItemView()
+    {
+         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
+        $liststores = Store::whereIn('id', $listdept)->get(); 
+        $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()
+
+        return view('report.searchByIssueItem', ['liststores'=>$liststores,'getItemid'=>$getItemid]);
+    }
+
+    public function searchIssuedItemReport(Request $request)
+    {
+         $request->validate([
+            'department' => 'required',
+             'item' => 'required',
+        ]);
+
+       
+        // All stores
+         $liststores = Store::all();
+        
+         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
+         $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()
+
+       $liststock = ItemIssue::where('store_id', $request->department)
+       ->where('item_id',$request->item)
+    ->where(function($query) {
+        $query->where('status', 'issued');
+              
+    })
+    ->orderBy('invoice_number')
+    ->get();
+        if ($liststock->count() > 0) {
+
+            return view(
+                'report.searchByIssueItem',
+                compact('liststock', 'liststores' ,  'getItemid')
+            )->with(
+                'message_success',
+                $liststock->count().' Items(s) found'
+            );
+
+        } else {
+
+            return view(
+                'report.searchByIssueItem',
+                compact('liststock', 'liststores','getItemid')
+            )->with(
+                'message_error',
+                'No Items found'
+            );
+    }
+    }
+
+    public function printIssuedByItemReport(Request $request)
+    {
+         
+
+       
+        // All stores
+         $liststores = Store::all();
+        
+         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
+         $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()
+
+       $liststock = ItemIssue::where('store_id', $request->department)
+       ->where('item_id',$request->item)
+    ->where(function($query) {
+        $query->where('status', 'issued');
+              
+    })
+    ->orderBy('invoice_number')
+    ->get();
+     $store = Store::find($request->department);
+      return view(
+        'report.printIssuedByItemReport',
+        compact('liststock', 'liststores','getItemid','store')
+    );
+    }
+
+      public function getsearchByIssuedDateView()
+    {
+         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
+        $liststores = Store::whereIn('id', $listdept)->get(); 
+        $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()
+
+        return view('report.searchByIssuedDate', ['liststores'=>$liststores,'getItemid'=>$getItemid]);
+    }
+
+     public function searchByIssuedDate(Request $request)
+    {
+       $request->validate([
+        'start_date' => 'required|date',
+        'end_date' => 'required|date',
+        'department' => 'required',
+    ]);
+
+       
+        // All stores
+        $liststores = Store::all();
+
+       $liststock = ItemIssue::where('store_id', $request->department)
+    ->where(function($query) {
+        $query->where('status', 'issued');
+            
+    }) ->whereBetween('created_at', [
+            $request->start_date . ' 00:00:00',
+            $request->end_date . ' 23:59:59'
+        ])
+ 
+    ->orderBy('id', 'DESC')
+    ->get();
+        if ($liststock->count() > 0) {
+
+            return view(
+                'report.searchByIssuedDate',
+                compact('liststock', 'liststores'  )
+            )->with(
+                'message_success',
+                $liststock->count().' Items(s) found'
+            );
+
+        } else {
+
+            return view(
+                'report.searchByIssuedDate',
+                compact('liststock', 'liststores')
+            )->with(
+                'message_error',
+                'No Items found'
+            );
+        }
+    }
+
+
+      public function printIssuedItemDateReport(Request $request)
+    {
+      
+       
+        // All stores
+        $liststores = Store::all();
+
+           $startDate = $request->start_date;
+          $endDate   = $request->end_date;
+
+       $liststock = ItemIssue::where('store_id', $request->department)
+    ->where(function($query) {
+        $query->where('status', 'issued');
+            
+    }) ->whereBetween('created_at', [
+            $request->start_date . ' 00:00:00',
+            $request->end_date . ' 23:59:59'
+        ])
+ 
+    ->orderBy('id', 'DESC')
+    ->get();
+        $store = Store::find($request->department);
+
+    return view(
+        'report.printIssuedItemDate',
+        compact('liststock', 'store','liststores', 'startDate',
+            'endDate')
+    );
+    }
+
+
+     public function getsearchIssuedItemByDateIntevView()
+    {
+         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
+        $liststores = Store::whereIn('id', $listdept)->get(); 
+        $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()
+
+        return view('report.searchIssuedItemByDateIntev', ['liststores'=>$liststores,'getItemid'=>$getItemid]);
+    }
+
+     public function searchIssuedItemByDateIntev(Request $request)
+    {
+          
+         $request->validate([
+        'start_date' => 'required|date',
+        'end_date' => 'required|date',
+        'item' => 'required',
+    ]);
+
+       
+        // All stores
+        $liststores = Store::all();
+         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
+         $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()
+       $liststock = ItemIssue::where('item_id', $request->item)
+    ->where(function($query) {
+        $query->where('status', 'issued');
+              
+    }) ->whereBetween('created_at', [
+            $request->start_date . ' 00:00:00',
+            $request->end_date . ' 23:59:59'
+        ])
+ 
+    ->orderBy('id', 'DESC')
+    ->get();
+        if ($liststock->count() > 0) {
+
+            return view(
+                'report.searchIssuedItemByDateIntev',
+                compact('liststock', 'liststores' ,'getItemid' )
+            )->with(
+                'message_success',
+                $liststock->count().' Items(s) found'
+            );
+
+        } else {
+
+            return view(
+                'report.searchIssuedItemByDateIntev',
+                compact('liststock', 'liststores','getItemid')
+            )->with(
+                'message_error',
+                'No Items found'
+            );
+        }
+    }
+
+
+     public function printIssuedItemDateIntervalReport(Request $request)
+    {
+        
+
+       
+        // All stores
+        $liststores = Store::all();
+         $startDate = $request->start_date;
+          $endDate   = $request->end_date;
+
+         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
+         $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()
+       $liststock = ItemIssue::where('item_id', $request->item)
+    ->where(function($query) {
+        $query->where('status', 'issued');
+              
+    }) ->whereBetween('created_at', [
+            $request->start_date . ' 00:00:00',
+            $request->end_date . ' 23:59:59'
+        ])
+ 
+    ->orderBy('id', 'DESC')
+    ->get();
+       $store = Store::find(Auth::user()->department_id);
+
+    return view(
+        'report.printIssuedItemByDateInterval',
+        compact('liststock', 'store','liststores', 'startDate',
+            'endDate','getItemid')
+    );
+    }
+
+
 
 }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stock Received Items Report</title>
+<title>Issued Items Report</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -481,7 +481,7 @@ tfoot td {
       </div>
     </div>
     <div class="report-title-block">
-      <div class="report-title">Received Items Report</div>
+      <div class="report-title">Issued Items Report</div>
       <div class="report-sub">Central   Stores Department</div>
     </div>
   </div>
@@ -549,30 +549,30 @@ tfoot td {
   </div> --}}
 
   <!-- TABLE -->
-  <div class="table-section">
-    <div class="table-header-bar">Received Item Breakdown — Stock Items</div>
+  <div class="table">
+    <div class="table-header-bar">Issued Items Breakdown  from  {{ \Carbon\Carbon::parse($startDate)->format('d M Y') }} -  {{ \Carbon\Carbon::parse($endDate)->format('d M Y') }} by Item</div>
     <table>
       <thead>
-        
-            <th>ID</th>
-            
-            <th>ITEM CODE</th>
-            <th >ITEM NAME</th>
-            <th>UoM</th>
-            <th>BATCH NO</th>
-            <th>VENDOR</th>
-            <th>PO</th>
-            <th>WAYBILL</th>
-            <th>EXPIRY DATE</th>
-             <th>CONTRACT NO. </th> 
-            
-            <th>UNIT COST</th>
-            <th>QUANTITY</th>
-            
-            <th>TOTAL AMOUNT</th>
-            
-        </tr>
-    </thead>
+            <tr>
+                <th>ID</th>
+                <th>Item Code</th>
+                <th >Item Name</th>
+                <th>UoM</th>
+                    
+                <th >Issuing Store </th>
+                <th >Receiving Store </th>
+                
+                
+                <th>Invoice No</th>
+                <th>Issued By</th>
+                <th>Date of Issue</th>
+                <th>Qty</th>
+                <th>Unit Cost</th>
+                <th>Amount</th>
+                
+                    
+            </tr>
+        </thead>
     <tbody>
             
                 @php  $grandTotal = 0; $totalqty = 0; @endphp
@@ -585,22 +585,25 @@ tfoot td {
                 $totalqty += $lists->qty;
             @endphp
             <tr>
-                <td>{{ $loop->iteration }}</td>
-                <td>{{ $lists->itemname->item_code }}</td>
-                <td>{{ $lists->itemname->name }}</td>
-                <td>{{ $lists->itemname->unitname->name ?? ''}}</td>
-                <td>{{ $lists->batch_number ?? '' }}</td>
+                <td>{{ $loop->iteration}}</td>
+                <td> {{ $lists->itemname->item_code }}</td>
+                <td>{{ $lists->itemname->name}}</td>
+                <td>{{ $lists->itemname->unitname->name}}</td>
                 
-                <td>{{ $lists->supname->company ?? '' }}</td>
-                <td>{{ $lists->purchase_order ?? ''}} </td>
-                <td>{{ $lists->waybill }}</td>
-                <td>{{ $lists->expiry_date }}</td>
-                <td>{{ $lists->award_letter }}</td> 
-                {{-- <td>{{ $lists->staffname->name }}</td> --}}
-                <td>{{ $lists->amount ?? ''}}</td>
-                <td>{{ $lists->qty ?? ''}} </td>
+                <td>{{ $lists->issuefrom->name}}</td>
+                <td>{{ $lists->storename->name}}</td>
                 
-                <td>{{ number_format($lineTotal,2)}}</td>
+                <td>{{ $lists->invoice_number}}</td>
+                <td>{{ $lists->staffname->name}}</td>
+                <td>{{ Carbon\Carbon::parse($lists->created_at)->format('F jS, Y \a\t h:i A') }} </td>
+                <td><b>{{ $lists->qty}}</b></td>
+                <td><b>{{ $lists->amount}}</b></td>
+                <td><b>{{ number_format($lineTotal,2)}}</b></td>
+                                                
+                
+        
+                
+                    
             </tr>
             @endforeach
              
@@ -608,10 +611,11 @@ tfoot td {
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="10"><span class="total-label">Grand Total</span></td>
-          <td></td>
-          <td><strong>{{ $totalqty }}</strong></td>
-          <td><strong>GH₵ {{ number_format($grandTotal,2) }}</strong></td>
+          <td colspan="9"><b style="float: right">TOTAL</b></td>
+                                                <td><b>{{ $totalqty }}</b></td>
+                                                <td><b></b></td>
+                                                
+                                                <td><b>{{ number_format($grandTotal,2)}}</b></td>
         </tr>
       </tfoot>
     </table>

@@ -45,5 +45,14 @@ protected $fillable = [
 	{
 		return $this->belongsTo(User::class, 'issued_by' ,'id'); // 'itemID' is the foreign key
 	}
+    
+
+       public function issuefrom()
+	{
+		return $this->belongsTo(Store::class, 'store_id' ,'id'); // 'itemID' is the foreign key
+	}
+     
+
+     
 
 }
