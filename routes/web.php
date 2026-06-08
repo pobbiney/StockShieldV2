@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Authentication\AuthenticationController;
 use App\Http\Controllers\Dashboard\DashboardController;
 use App\Http\Controllers\Report\ReportController;
+use App\Http\Controllers\Report\ReportDetailsController;
 use App\Http\Controllers\UserManagement\UserManagementController;
 use App\Http\Controllers\Staff\StaffController;
 use App\Http\Controllers\Settings\SettingsController;
@@ -190,11 +191,14 @@ Route::get('/issued-item-date-print',
     [ReportController::class, 'printIssuedItemDateReport'])
     ->middleware('auth')  ->name('report.issued-item-date-print');
 
-    Route::get('searchIssuedItemByDateIntev',[ReportController::class,'getsearchIssuedItemByDateIntevView'])->name('searchIssuedItemByDateIntev');
+Route::get('searchIssuedItemByDateIntev',[ReportController::class,'getsearchIssuedItemByDateIntevView'])->name('searchIssuedItemByDateIntev');
+Route::post('searchIssuedItemByDateIntev',[ReportController::class,'searchIssuedItemByDateIntev'])->name('report.searchIssuedItemByDateIntev-report');
+Route::get('/issued-item-byitemDate-print',[ReportController::class, 'printIssuedItemDateIntervalReport'])->middleware('auth')  ->name('report.issued-item-byitemDate-print');
+Route::get('CommodityReport',[ReportDetailsController::class,'getCommodityReportView'])->name('CommodityReport'); 
+Route::post('CommodityReport',[ReportDetailsController::class,'searchCommodityReport'])->name('report.searchCommodity-report');
+Route::get('/commodityreport-print',[ReportDetailsController::class, 'printCommoditySummaryReport'])->middleware('auth')  ->name('report.commodityreport-print');
 
-    Route::post('searchIssuedItemByDateIntev',[ReportController::class,'searchIssuedItemByDateIntev'])->name('report.searchIssuedItemByDateIntev-report');
-    Route::get('/issued-item-byitemDate-print',
-    [ReportController::class, 'printIssuedItemDateIntervalReport'])
-    ->middleware('auth')  ->name('report.issued-item-byitemDate-print');
+Route::get('DetailedCommodityReport',[ReportDetailsController::class,'getDetailedCommodityReportView'])->name('DetailedCommodityReport'); 
+Route::post('DetailedCommodityReport',[ReportDetailsController::class,'searchCommodityDetailReport'])->name('report.searchCommodityDetails-report');
 
 /* End of Report */
