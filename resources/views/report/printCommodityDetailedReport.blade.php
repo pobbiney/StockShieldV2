@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Commodity Summary  Report</title>
+<title>Commodity Detailed  Report</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -481,7 +481,7 @@ tfoot td {
       </div>
     </div>
     <div class="report-title-block">
-      <div class="report-title">Commodity Summary Report</div>
+      <div class="report-title">Commodity Detailed Report</div>
       <div class="report-sub">Central   Stores Department</div>
     </div>
   </div>
@@ -510,60 +510,61 @@ tfoot td {
 
   <!-- TABLE -->
   <div class="table">
-    <div class="table-header-bar">Summary of Commodities Report - @if(request()->start_date && request()->end_date)
+    <div class="table-header-bar">Detailed Commodities Report - @if(request()->start_date && request()->end_date)
                                                    {{ \Carbon\Carbon::parse(request()->start_date)->format('F Y') }} @endif </div>
     <table>
       <thead>
              <tr>
-                <th>ID</th>
-                <th>Store Location</th>
-                
-                <th>Balance B/F Value GHS</th>
-                    
-                <th >Receipt Value GHS</th>
-                <th >Total Stock Value GHS </th>
-                
-                
-                <th>Issued Value GHS</th>
-                <th>Closing Balance Value GHS</th>
-                    
-                
-                    
-            </tr>
-        </thead>
-        <tbody>
-                
-                
+                                            <th>ID</th>
+                                            <th>Item Description</th>
+                                            <th>UoM</th>
+                                            <th>Price</th>
+                                            <th>Balance B/F </th>
+                                            <th>Balance B/F Value  </th>
+                                            <th>Receipts </th>
+                                            
+                                            <th >Receipt Value  </th>
+                                            <th >Total Stock   </th>
+                                            <th >Total Stock  Value  </th>
+                                            
+                                            <th>Issued </th>
+                                            <th>Issued Value  </th>
+                                            <th>Closing Balance</th>
+                                            <th>Closing Balance Value  </th>
+                                            
+                                            
+                                                
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                          
+                                      
+                                        @foreach($reportData as $item)
+
+                                         
         
 
-            @foreach($reportData as $store)
- 
-
-            <tr>
-                 <td>{{ $loop->iteration }}</td>
-                            <td>
-                                {{ $store['store_name'] }} 
-                               
-                  </td>
-                  <td  >{{ $store['balance_bf_value'] }}</td>
-                  <td  >{{ $store['receipts_value'] }}</td>
-                  <td  >{{ $store['total_stock_value'] }}</td>
-                  <td  >{{ $store['issued_value'] }}</td>
-                  <td  >
-                      {{ $store['closing_balance_value'] }}
-                  </td>
-            </tr>
+                                         <tr>
+                                         <td>{{ $loop->iteration }}</td>
+                                        <td>{{ $item['item_description'] }}</td>
+                                        <td>{{ $item['uom'] }}</td>
+                                        <td class="text-end">{{ $item['price'] }}</td>
+                                        <td class="text-end">{{ number_format($item['balance_bf_qty']) }}</td>
+                                        <td class="text-end">{{ $item['balance_bf_value'] }}</td>
+                                        <td class="text-end">{{ number_format($item['receipts_qty']) }}</td>
+                                        <td class="text-end">{{ $item['receipts_value'] }}</td>
+                                       
+                                        <td class="text-end">{{ number_format($item['total_stock_qty']) }}</td>
+                                        <td class="text-end">{{ $item['total_stock_value'] }}</td>
+                                        <td class="text-end">{{ number_format($item['issued_qty']) }}</td>
+                                        <td class="text-end">{{ $item['issued_value'] }}</td>
+                                        <td class="text-end  ">{{ number_format($item['closing_balance_qty']) }}</td>
+                                        <td class="text-end  ">{{ $item['closing_balance_value'] }}</td>
+                                    </tr>
 
             @endforeach
 
-            <tr class="fw-bold bg-light">
-                <td colspan="2" class="text-end">GRAND TOTAL:</th>
-                            <td> <b> {{number_format($totalBF,2)}}</b></td>
-                            <td> <b> {{number_format($totalREc,2)}}</b></td>
-                            <td> <b> {{number_format($totalStockval,2)}}</b></td>
-                            <td> <b> {{number_format($totalIssVal,2)}}</b></td>
-                            <td> <b> {{number_format($totalClVal,2)}}</b></td>
-            </tr>
+           
                 
         </tbody>
     </table>

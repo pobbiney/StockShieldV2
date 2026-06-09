@@ -200,5 +200,6 @@ Route::get('/commodityreport-print',[ReportDetailsController::class, 'printCommo
 
 Route::get('DetailedCommodityReport',[ReportDetailsController::class,'getDetailedCommodityReportView'])->name('DetailedCommodityReport'); 
 Route::post('DetailedCommodityReport',[ReportDetailsController::class,'searchCommodityDetailReport'])->name('report.searchCommodityDetails-report');
+Route::get('/commoditydetailedreport-print',[ReportDetailsController::class, 'printCommodityDetailReport'])->middleware('auth')  ->name('report.commoditydetailedreport-print');
 
 /* End of Report */

@@ -100,7 +100,7 @@
                         <hr/>
 
                       @if(isset($reportData) && count($reportData) > 0)
-                          <a  href="{{ route('report.commodityreport-print', ['start_date' => request()->start_date, 'end_date' => request()->end_date]) }}" target="_blank" class="btn btn-primary" style=" margin-bottom:10px"><i class="bi bi-printer"></i> Print</a>
+                          <a  href="{{ route('report.commoditydetailedreport-print', ['start_date' => request()->start_date, 'end_date' => request()->end_date,'department' => request()->department]) }}" target="_blank" class="btn btn-primary" style=" margin-bottom:10px"><i class="bi bi-printer"></i> Print</a>
                           <div class="table-responsive">
                             
                                 <table  class="table table-bordered "  >
@@ -133,15 +133,7 @@
                                     </thead>
                                     <tbody>
                                           
-                                         
-                                        @php
-                                        $totalBF = 0;
-                                        $totalReceipt = 0;
-                                        $totalStock = 0;
-                                        $totalIssued = 0;
-                                        $totalClosing = 0;
-                                        @endphp
-
+                                      
                                         @foreach($reportData as $item)
 
                                          

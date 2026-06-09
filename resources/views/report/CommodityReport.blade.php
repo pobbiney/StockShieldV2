@@ -42,17 +42,17 @@
             <hr/>
             
             <div class="card-body">
-                  @if(isset($report))
-                            @if($report->count() > 0)
-                                <div class="alert alert-success mt-2">
-                                    {{ $report->count() }} result(s) found
-                                </div>
-                            @else
-                                <div class="alert alert-danger mt-2">
-                                    No results found
-                                </div>
-                            @endif
+                  @if(isset($reportData))
+                        @if(count($reportData) > 0)
+                            <div class="alert alert-success mt-2">
+                                {{ count($reportData) }} result(s) found
+                            </div>
+                        @else
+                            <div class="alert alert-danger mt-2">
+                                No results found
+                            </div>
                         @endif
+                    @endif
                         <form id="form" enctype="multipart/form-data" method="POST" action="{{ route('report.searchCommodity-report') }}">
                             @csrf
                             <div class="row">
@@ -85,7 +85,7 @@
                         </form>
                         <hr/>
 
-                        @if(isset($report) && $report->count() > 0)
+                       @if(isset($reportData) && count($reportData) > 0)
                           <a  href="{{ route('report.commodityreport-print', ['start_date' => request()->start_date, 'end_date' => request()->end_date]) }}" target="_blank" class="btn btn-primary" style=" margin-bottom:10px"><i class="bi bi-printer"></i> Print</a>
                           <div class="table-responsive">
                             
@@ -114,57 +114,45 @@
                                     </thead>
                                     <tbody>
                                           
-                                         
-                                        @php
-                                        $totalBF = 0;
-                                        $totalReceipt = 0;
-                                        $totalStock = 0;
-                                        $totalIssued = 0;
-                                        $totalClosing = 0;
-                                        @endphp
+                                              
+                                       
 
-                                        @foreach($report as $row)
-
-                                        @php
-                                        $totalBF += $row['balance_bf'];
-                                        $totalReceipt += $row['receipt_value'];
-                                        $totalStock += $row['total_stock_value'];
-                                        $totalIssued += $row['issued_value'];
-                                        $totalClosing += $row['closing_balance'];
-                                        @endphp
-
-                                        <tr>
-                                            <td>{{ $row['id'] }}</td>
-                                            <td>{{ $row['store_name'] }}</td>
-
-                                            <td>{{ number_format($row['balance_bf'],2) }}</td>
-
-                                            <td>{{ number_format($row['receipt_value'],2) }}</td>
-
-                                            <td>{{ number_format($row['total_stock_value'],2) }}</td>
-
-                                            <td>{{ number_format($row['issued_value'],2) }}</td>
-
-                                            <td>{{ number_format($row['closing_balance'],2) }}</td>
-                                        </tr>
-
-                                        @endforeach
-
-                                        <tr class="fw-bold bg-light">
-                                            <td colspan="2">GRAND TOTAL</td>
-
-                                            <td>{{ number_format($totalBF,2) }}</td>
-
-                                            <td>{{ number_format($totalReceipt,2) }}</td>
-
-                                            <td>{{ number_format($totalStock,2) }}</td>
-
-                                            <td>{{ number_format($totalIssued,2) }}</td>
-
-                                            <td>{{ number_format($totalClosing,2) }}</td>
-                                        </tr>
-                                            
-                                    </tbody>
+                                         @forelse($reportData as $store)
+                                           
+                        <tr>
+                            <td>{{ $loop->iteration }}</td>
+                            <td>
+                                {{ $store['store_name'] }} 
+                               
+                            </td>
+                            <td class="text-end">{{ $store['balance_bf_value'] }}</td>
+                            <td class="text-end">{{ $store['receipts_value'] }}</td>
+                            <td class="text-end  ">{{ $store['total_stock_value'] }}</td>
+                            <td class="text-end">{{ $store['issued_value'] }}</td>
+                            <td class="text-end ">
+                                {{ $store['closing_balance_value'] }}
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="7" class="text-center text-danger">
+                                <strong>No store data available</strong>
+                            </td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                   
+                    <tfoot class="bg-light">
+                        <tr>
+                            <th colspan="2" class="text-end">GRAND TOTAL:</th>
+                            <th class="text-end"> <b> {{number_format($totalBF,2)}}</b></th>
+                            <th class="text-end"> <b> {{number_format($totalREc,2)}}</b></th>
+                            <th class="text-end"> <b> {{number_format($totalStockval,2)}}</b></th>
+                            <th class="text-end"> <b> {{number_format($totalIssVal,2)}}</b></th>
+                            <th class="text-end"> <b> {{number_format($totalClVal,2)}}</b></th>
+                        </tr>
+                    </tfoot>
+                   
                                 </table>
                              
                              
