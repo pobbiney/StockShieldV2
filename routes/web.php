@@ -7,6 +7,7 @@ use App\Http\Controllers\Authentication\AuthenticationController;
 use App\Http\Controllers\Dashboard\DashboardController;
 use App\Http\Controllers\Report\ReportController;
 use App\Http\Controllers\Report\ReportDetailsController;
+use App\Http\Controllers\Requisition\RequisitionController;
 use App\Http\Controllers\UserManagement\UserManagementController;
 use App\Http\Controllers\Staff\StaffController;
 use App\Http\Controllers\Settings\SettingsController;
@@ -50,6 +51,8 @@ Route::post('logout-authentication-process',[DashboardController::class,'logoutA
 Route::get('create-staff',[StaffController::class,'addStaffView'])->name('create-staff');
 Route::post('add-staff-process',[StaffController::class,'addStaff'])->name('add-staff-process');
 Route::get('list-staff',[StaffController::class,'getStaffListView'])->name('list-staff');
+Route::get('edit-staff/{staff_id}',[StaffController::class,'getEditStaffView'])->name('edit-staff');
+Route::post('edit-staff-process/{staff_id}',[StaffController::class,'editStaff'])->name('edit-staff-process');
 /** End of Staff Manager */
 
 
@@ -203,3 +206,9 @@ Route::post('DetailedCommodityReport',[ReportDetailsController::class,'searchCom
 Route::get('/commoditydetailedreport-print',[ReportDetailsController::class, 'printCommodityDetailReport'])->middleware('auth')  ->name('report.commoditydetailedreport-print');
 
 /* End of Report */
+
+
+/* Requisition */
+
+Route::get('Requisition',[RequisitionController::class,'getRequisitionView'])->name('Requisition'); 
+/* End of Requisition */

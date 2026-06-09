@@ -101,6 +101,7 @@
 
                       @if(isset($reportData) && count($reportData) > 0)
                           <a  href="{{ route('report.commoditydetailedreport-print', ['start_date' => request()->start_date, 'end_date' => request()->end_date,'department' => request()->department]) }}" target="_blank" class="btn btn-primary" style=" margin-bottom:10px"><i class="bi bi-printer"></i> Print</a>
+                            <a  href=" " target="_blank" class="btn btn-success" style=" margin-bottom:10px"><i class="bi bi-file-earmark-excel"></i> Export to Excel</a>
                           <div class="table-responsive">
                             
                                 <table  class="table table-bordered "  >
@@ -157,10 +158,7 @@
                                         <td class="text-end  ">{{ $item['closing_balance_value'] }}</td>
                                     </tr>
 
-                                        @endforeach
-
-                                        
-                                            
+                                        @endforeach    
                                     </tbody>
                                 </table>
                              

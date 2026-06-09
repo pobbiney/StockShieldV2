@@ -8,6 +8,7 @@ use App\Models\Staff;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 
 class StaffController extends Controller
 {
@@ -167,5 +168,71 @@ class StaffController extends Controller
             return $status ? back()->with('message_success','Supplier updated successfully') : back()->with('message_error','Something went wrong, please try again.');
 
  
+    }
+
+    public function getStaffListView()
+    {
+        $liststaff = Staff::all();
+        return view('staff-management.list-staff',['liststaff'=>$liststaff]);
+
+    }
+
+    public function getEditStaffView($staff_id){
+    $decodeID = Crypt::decrypt($staff_id);
+     
+    $data = Staff::where('staff_id',$decodeID)->first();
+    $list = Department::all();
+    
+    return view ('staff-management.edit-staff',[ 'data'=>$data,'staff_id'=>$staff_id,'list'=>$list ]);
+    }
+
+    public function editStaff(Request $request, $staff_id)
+    {
+         $request->validate([
+            'title' => 'required',
+            'surname' => 'required',
+            'firstname' => 'required',
+            'gender' => 'required',
+            'email' => 'required',
+            'phone' => 'required',
+             
+            'staff_number' => 'required',
+            'position' => 'required',
+            'department' => 'required',
+        ]);
+
+
+          $decodeId = Crypt::decrypt($staff_id);
+          $insertstaff =  Staff::find($decodeId);
+
+        
+        if($request->hasFile('image')){
+            $file = $request->file('image');
+            $ext = $file->getClientOriginalExtension();
+            $filename = time().'.'.$ext;
+
+            $file->move(public_path('uploads/profile-photo'), $filename);
+
+            $insertstaff->picture = 'uploads/profile-photo/'.$filename;
+        }
+        $insertstaff->title = trim($request->title);
+        $insertstaff->surname = trim($request->surname);
+        $insertstaff->firstname = trim($request->firstname);
+        $insertstaff->othername = trim($request->othername);
+        $insertstaff->gender = trim($request->gender);
+        $insertstaff->personal_email = trim($request->email);
+        $insertstaff->contact_num = trim($request->phone);
+        $insertstaff->position = trim($request->position);
+        $insertstaff->employee_id = trim($request->staff_number);
+        $insertstaff->digital_address = trim($request->address);
+        $insertstaff->department_id = trim($request->department);
+        $insertstaff->updated_by = Auth::user()->id;
+
+        $status = $insertstaff->update();
+
+        return $status 
+            ? back()->with('message_success','Staff updated successfully') 
+            : back()->with('error_message','Something went wrong, please try again.');
+
     }
 }
