@@ -562,6 +562,7 @@ class StockController extends Controller
 
         return response()->json([
             'batch_number' => $stock->batch_number,
+            'store_id' => $stock->store_id,
             'stock_id'     => $stock->id,
             'qty'          => $stock->qty,
             'expiry_date'  => $stock->expiry_date

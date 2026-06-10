@@ -1,4 +1,4 @@
- <!-- page title -->
+  <!-- page title -->
 @php $pageName = "stock"; $subpageName = "pending-stock"; @endphp
 
 @extends('layouts.backendapp')
@@ -33,7 +33,7 @@
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item bi"><a href="#">Stock Management</a></li>
                         <li class="breadcrumb-item bi"><a href="#">Requisition</a></li>
-                        <li class="breadcrumb-item bi"><a href="#">  Item  Requisition</a></li>
+                        <li class="breadcrumb-item bi"><a href="#"> Request Item  </a></li>
                     </ol>
                 </nav>
             </div>
@@ -49,7 +49,7 @@
             <div class="card-header">
                 <div class="row gx-3 gx-lg-4 align-items-center">
                     <div class="col">
-                        <p class="h6">  Item Request</p>
+                        <p class="h6">  Item Request </p>
                     </div>
                     <div class="col-auto">
                         <button type="button" class="btn btn-outline-theme btn-square" data-bs-toggle="collapse" data-bs-target="#collapse1" aria-expanded="false">
@@ -62,27 +62,14 @@
             
             <div class="card-body">
              
-                {{-- <div class="row gx-3 align-items-center" >
-                    <div class="col-auto">
-                        <div class="avatar avatar-60 rounded bg-theme-1-subtle text-theme-1 theme-green">
-                            <i class="bi bi-boxes h4"></i>
-                        </div>
-                    </div>
-                    <div class="col">
-                        <p class="text-secondary small mb-1">Available Stock Balance</p>
-                        <h5 class="text-dark mb-0"><span class="increamentcount" id="qty"></span> <small class="h6"></small></h5>
-                         
-                    </div>
-                </div> --}}
-             
-            
+                
           
-           <form method="post" enctype="multipart/form-data" action="{{ route('add-itemissue-process') }}">
+           <form method="post" enctype="multipart/form-data" action="{{ route('add-request-process') }}">
             @csrf
                 <div class="row gx-3 align-items-center">
                     <div class="row" style="margin-top:50px ">
                         
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <select class="js-example-basic-single form-control" name="item" id="item_id" >
                                     <option value="" selected disabled>--Select Item--</option>
                                         @foreach ($getItemid as $listitems )
@@ -92,19 +79,27 @@
                         
                                  @error('item') <small style="color:red"> {{ $message}}</small> @enderror  
                             </div>
-                            
-                            
+                            <div class="col-md-4">
+                                <div class="form-group mb-3 position-relative check-valid">
+                                    <div class="form-floating">
+                                        <input type="text" name="batch_number" id="batch_number" class="form-control"  readonly
+                                        />
+                                         <label>Batch Number</label>
+                                    </div>
+                                </div>
+                            </div>
+                             
                             <div class="col-md-2">
                                 <div class="form-group mb-3 position-relative check-valid">
                                     <div class="form-floating">
                                         <input type="number" class="form-control" name="quantity" placeholder="Enter Qty" >
-                                        <label>Quantity</label>
+                                        <label>Qty</label>
                                         @error('quantity') <small style="color:red"> {{ $message}}</small> @enderror
                                     
                                     </div>
                                 </div>
                             </div>
-                             
+                            
                             <div class="col-md-1">
                                 <div class="form-group mb-3 position-relative check-valid">
                                     <button type="submit" class="btn btn-success"><i class="fa fa-plus"></i></button>
@@ -115,9 +110,10 @@
             </div>
              
             <input type="hidden" name="stock_id" id="stock_id"/>
+             <input type="hidden" name="store_id" id="store_id"/>
            </form>
 
-             {{-- @if($listitemissue->count() > 0)
+             @if($listitemissue->count() > 0)
              <div class="border-start border-top p-3 bg-l-gradient-light theme-green">
             
                 
@@ -135,8 +131,8 @@
                                             
                                             <th>Qty</th>
                                             <th>Cost</th>
-                                            <th>Requisition No  </th>
-                                            <th>Issue To</th>
+                                          
+                                           
                                               
                                             <th>Action</th>
                                                 
@@ -154,8 +150,8 @@
                                                
                                                 <td>{{$lists->qty}}</td>
                                                 <td> {{$lists->amount}}</td>
-                                                <td> {{$lists->requisition_no}}</td>
-                                                <td> {{$lists->storename->name}}</td>
+                                               
+                                                 
                                                     <td><a class="btn btn-sm btn-danger delete-btn"  onclick="return confirm( 'Are you sure you want to delete this Item?')" href=" {{ url('IssueItem/'.$lists->id).'/delete' }}"   ><i class="fa fa-trash"></i> </a>
                                                       
                                                     </td>
@@ -174,7 +170,7 @@
                     </div>
                 </div>
                 @endif
-         </div> --}}
+         </div>
         
         </div>
     </div>
@@ -225,6 +221,7 @@
 
                 if (response.batch_number) {
                     $('#batch_number').val(response.batch_number);
+                     $('#store_id').val(response.store_id);
                     $('#stock_id').val(response.stock_id);
                     $('#qty').text(response.qty);
                 } else {

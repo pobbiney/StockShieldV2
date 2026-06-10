@@ -211,4 +211,5 @@ Route::get('/commoditydetailedreport-print',[ReportDetailsController::class, 'pr
 /* Requisition */
 
 Route::get('Requisition',[RequisitionController::class,'getRequisitionView'])->name('Requisition'); 
+Route::post('add-request-process',[RequisitionController::class,'addRequest'])->name('add-request-process');
 /* End of Requisition */
