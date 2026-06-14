@@ -18,6 +18,7 @@ class ItemRequest extends Model
     'item_store_id',
     'status',
     'created_by',
+	'store_id',
 
     
 ];
@@ -34,7 +35,7 @@ class ItemRequest extends Model
 
     public function storename()
 	{
-		return $this->belongsTo(Store::class, 'issue_to' ,'id'); // 'itemID' is the foreign key
+		return $this->belongsTo(Store::class, 'store_id' ,'id'); // 'itemID' is the foreign key
 	}
 
      public function staffname()

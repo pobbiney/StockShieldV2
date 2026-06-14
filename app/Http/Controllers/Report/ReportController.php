@@ -503,7 +503,7 @@ public function searchStockLevelReport(Request $request)
         $query->where('status', 'issued');
             
     })
-    ->orderBy('invoice_number')
+    ->orderBy('id', 'DESC')
     ->get();
         if ($liststock->count() > 0) {
 

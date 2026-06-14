@@ -18,6 +18,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Imports\ItemsImport;
+use App\Models\ItemRequest;
 use Maatwebsite\Excel\Facades\Excel;
  
 
@@ -528,17 +529,20 @@ class StockController extends Controller
 
     public function getIssueItemView()
     {
-        $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
-        $getItemid = Item::whereIn('store_id', $listdept)
-        ->where('status','Active')
-        ->get(); // fix: whereIn + get()
-        $liststore = Store::all();
-        
+        $listdept = array_map('intval', explode('~', Auth::user()->department_id));
 
-        $listitemissue = ItemIssue::where('store_id',$listdept)
-        ->where('status','pending')
-        ->get();
-        return view('stock.IssueItem', ['getItemid'=>$getItemid,'liststore'=>$liststore,'listitemissue'=>$listitemissue]);
+        $listrequest = ItemRequest::where('item_store_id', $listdept)
+            ->whereIn('id', function ($query) use ($listdept) {
+                $query->selectRaw('MAX(id)')
+                    ->from('item_requests')
+                    ->where('item_store_id', $listdept)
+                    ->where('status','request approved')
+                    ->groupBy('requisition_no');
+            })
+            ->orderBy('id', 'DESC')
+            ->get();
+        
+                return view('stock.IssueItem', ['listrequest'=>$listrequest ]);
     }
 
     public function getBatchNumber(Request $request)
@@ -684,7 +688,7 @@ class StockController extends Controller
         $liststores = Store::all();
 
         // Search issues
-        $listissues = ItemIssue::where('status', 'pending_issues')
+        $listissues = ItemIssue::where('status', 'pending')
                        
                         ->where('issue_to', $request->department)
                         ->get();
@@ -724,7 +728,7 @@ class StockController extends Controller
         foreach ($request->issue_id as $issueId) {
 
             $issue = ItemIssue::where('id', $issueId)
-                ->where('status', 'pending_issues')
+                ->where('status', 'pending')
                 ->first();
 
             if (!$issue) continue;
@@ -756,6 +760,12 @@ class StockController extends Controller
             $issue->save();
 
             $lastInvoice = $invoiceNo;
+
+            $itemRequests = ItemRequest::where('requisition_no',$issue->requisition_no)
+          
+            ->update([
+                'status' => 'issued'
+            ]);
         }
 
         return redirect()->route('stock.print', $lastInvoice)

@@ -33,7 +33,7 @@
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item bi"><a href="#">Stock Management</a></li>
                         <li class="breadcrumb-item bi"><a href="#">Stock</a></li>
-                        <li class="breadcrumb-item bi"><a href="#">Issue Item  </a></li>
+                        <li class="breadcrumb-item bi"><a href="#">Pick List</a></li>
                     </ol>
                 </nav>
             </div>
@@ -49,7 +49,7 @@
             <div class="card-header">
                 <div class="row gx-3 gx-lg-4 align-items-center">
                     <div class="col">
-                        <p class="h6">Issue Item  </p>
+                        <p class="h6">Pick List </p>
                     </div>
                     <div class="col-auto">
                         <button type="button" class="btn btn-outline-theme btn-square" data-bs-toggle="collapse" data-bs-target="#collapse1" aria-expanded="false">
@@ -82,8 +82,8 @@
                                             @foreach($listrequest as $lists)
                                             <tr>
                                                 <td>{{ $loop->iteration}}</td>
-                                                <td> You have a pending request from {{ $lists->storename->name}} with Requisition Number <b>{{ $lists->requisition_no}}</b></td>
-                                                <td><a href="{{ route('viewStoreRequest', Crypt::encrypt($lists->requisition_no)) }}" class="btn btn-success"><i class="fa fa-eye"></i> Open Request </a></td>
+                                                <td> Item ready for pick up from {{ $lists->storename->name}} with Requisition Number <b>{{ $lists->requisition_no}}</b></td>
+                                                <td><a href="{{ route('viewPickUp', Crypt::encrypt($lists->requisition_no)) }}" class="btn btn-success"><i class="fa fa-truck"></i> Pick up </a></td>
                                                
                                                      
                                             </tr> 

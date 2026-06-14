@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -482,7 +482,7 @@ tfoot td {
     </div>
     <div class="report-title-block">
       <div class="report-title">Invoice</div>
-      <div class="report-sub">#{{ $invoice }}</div>
+      <div class="report-sub">#{{ $decodeID }}</div>
     </div>
   </div>
 
@@ -521,7 +521,7 @@ tfoot td {
       
       <div class="info-row">
         <span class="info-key">Invoice Number:</span>
-        <span class="info-val">#{{$invoice }}</span>
+        <span class="info-val">#{{$decodeID }}</span>
       </div>
     </div>
     <div class="info-block">

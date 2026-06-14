@@ -127,10 +127,11 @@
                                             <th>ID</th>
                                             <th>Item Code</th>
                                             <th >Item Name</th>
+                                            
                                             <th>Batch Number</th>
                                             
                                             <th>Qty</th>
-                                            <th>Cost</th>
+                                            <th>Unit Cost</th>
                                           
                                            
                                               
@@ -146,13 +147,14 @@
                                                 <td>{{ $loop->iteration}}</td>
                                                 <td> {{ $lists->itemcode->item_code }}</td>
                                                 <td>{{ $lists->itemname->name}}</td>
+                                              
                                                 <td>{{$lists->batch_number}}</td>
                                                
                                                 <td>{{$lists->qty}}</td>
                                                 <td> {{$lists->amount}}</td>
                                                
                                                  
-                                                    <td><a class="btn btn-sm btn-danger delete-btn"  onclick="return confirm( 'Are you sure you want to delete this Item?')" href=" {{ url('IssueItem/'.$lists->id).'/delete' }}"   ><i class="fa fa-trash"></i> </a>
+                                                    <td><a class="btn btn-sm btn-danger delete-btn"  onclick="return confirm( 'Are you sure you want to delete this Item?')" href=" {{ url('Requisition/'.$lists->id).'/delete' }}"   ><i class="fa fa-trash"></i> </a>
                                                       
                                                     </td>
                                             </tr>
@@ -163,7 +165,7 @@
                                     </tbody>
                                 </table>
                              
-                                <a href="{{ route('stock.IssueapproveAll') }}" class="btn btn-info" onclick="return confirm('Save all pending Issues ?')"><i class="fa fa-save"></i> Save All</a>
+                                <a href="{{ route('requisition.SubmitRequest') }}" class="btn btn-info" onclick="return confirm('Are you sure you want to save for approval ?')"><i class="fa fa-save"></i> Submit Request</a>
                                     
                             </div>
                         </div>

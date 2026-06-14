@@ -53,6 +53,8 @@
                                 </div>
                             @endif
                         @endif
+
+                        
                         <form id="form" enctype="multipart/form-data" method="POST" action="{{ route('stock.search-issues') }}">
                             @csrf
                             <div class="row">
@@ -80,7 +82,7 @@
                         <hr/>
 
                         @if(isset($listissues) && $listissues->count() > 0)
-                        <form  id="approveForm" method="POST" action="{{ route('approveIssue-process') }}"  target="_blank">
+                        <form  id="approveForm" method="POST" action="{{ route('approveIssue-process') }}" target="_" >
                             @csrf
                           <div class="table-responsive">
                             
@@ -132,10 +134,16 @@
                                     </tbody>
                                 </table>
                              
-                                <button onclick="openPrintTab()" type="submit" class="btn btn-info" onclick="return confirm('Are you sure you want to approve  all  Issues ?')"><i class="fa fa-check-circle"></i> Approve All</button>
+                                @if($listissues->isNotEmpty())
+                                    <input type="hidden" name="store_id" value="{{ $listissues->first()->issue_to }}"/>
                                     
+                                    <button type="submit" class="btn btn-info" 
+                                        onclick="return confirm('Are you sure you want to approve all Issues?')">
+                                        <i class="fa fa-check-circle"></i> Approve All
+                                    </button>
+                                @endif  
                             </div>
-                            <input type="hidden" name="store_id" value="{{ $lists->issue_to }}"/>
+                             
                         </form>
                             @endif
             </div>
@@ -152,10 +160,16 @@
 
  
 <script>
-function openPrintTab() {
-    document.getElementById('approveForm').target = '_blank';
-    document.getElementById('approveForm').submit();
-}
+   @if(session('print_url'))
+<script>
+    var printWindow = window.open("{{ session('print_url') }}", '_blank');
+    if (!printWindow) {
+        alert('Please allow popups for this site to open the print page automatically.');
+        window.location.href = "{{ session('print_url') }}";  // fallback: open in same tab
+    }
+</script>
+@endif
+ 
 </script>
 
   @include('stock.reject-issue-modal')

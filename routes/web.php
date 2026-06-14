@@ -5,6 +5,7 @@ use App\Http\Controllers\Asset\AssetController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Authentication\AuthenticationController;
 use App\Http\Controllers\Dashboard\DashboardController;
+use App\Http\Controllers\Issues\IssueController;
 use App\Http\Controllers\Report\ReportController;
 use App\Http\Controllers\Report\ReportDetailsController;
 use App\Http\Controllers\Requisition\RequisitionController;
@@ -142,12 +143,13 @@ Route::get('IssueApproval',[StockController::class,'getIssueApproval'])->name('I
 Route::post('IssueApproval',[StockController::class,'searchIssues'])->name('stock.search-issues');
 
 Route::post('approveIssue-process', [StockController::class, 'ApproveIssueIndv'])->name('approveIssue-process');
-Route::get('/stock/print/{invoice}', [StockController::class, 'printIssue'])
+Route::get('/stock/prints/{invoice}', [StockController::class, 'printIssue'])
     ->name('stock.print');
 Route::post('add-bulkupload-process', [StockController::class, 'addBulkupload'])->name('add-bulkupload-process');
 
 Route::get('issue-item-id/{id}',[StockController::class,'getIssueItemID'])->name('issue-item-id');
 Route::post('add-rejection-process', [StockController::class, 'addItemRejection'])->name('add-rejection-process');
+Route::get('MyRequest',[StockController::class,'getMyRequestView'])->name('MyRequest');
  
 /* End of Stock Management */
 
@@ -205,6 +207,7 @@ Route::get('DetailedCommodityReport',[ReportDetailsController::class,'getDetaile
 Route::post('DetailedCommodityReport',[ReportDetailsController::class,'searchCommodityDetailReport'])->name('report.searchCommodityDetails-report');
 Route::get('/commoditydetailedreport-print',[ReportDetailsController::class, 'printCommodityDetailReport'])->middleware('auth')  ->name('report.commoditydetailedreport-print');
 
+
 /* End of Report */
 
 
@@ -212,4 +215,26 @@ Route::get('/commoditydetailedreport-print',[ReportDetailsController::class, 'pr
 
 Route::get('Requisition',[RequisitionController::class,'getRequisitionView'])->name('Requisition'); 
 Route::post('add-request-process',[RequisitionController::class,'addRequest'])->name('add-request-process');
+Route::get('Requisition/{id}/delete', [RequisitionController::class, 'deleteitemRequest']);
+ 
+Route::get('/submit-all-requests', [RequisitionController::class, 'submitRequest'])
+    ->name('requisition.SubmitRequest');
+Route::get('MyRequest',[RequisitionController::class,'getMyRequestView'])->name('MyRequest'); 
+Route::get('ApproveRequest',[RequisitionController::class,'getApproveRequestView'])->name('ApproveRequest'); 
+Route::get('viewRequest/{requisition_no}',[RequisitionController::class,'getviewRequest'])->name('viewRequest');
+Route::get('request-item-id/{id}',[RequisitionController::class,'getrequesttemID'])->name('request-item-id');
+Route::post('add-reject-request-process', [RequisitionController::class, 'addItemRejectRequest'])->name('add-reject-request-process');
+Route::post('approve-request-process', [RequisitionController::class, 'addApproveRequest'])->name('approve-request-process');
+
+
 /* End of Requisition */
+
+/* Issues */
+Route::get('viewStoreRequest/{requisition_no}',[IssueController::class,'getviewStoreRequest'])->name('viewStoreRequest');
+Route::post('issue-request-process', [IssueController::class, 'addIssueRequest'])->name('issue-request-process');
+Route::get('PickList',[RequisitionController::class,'getPickListView'])->name('PickList'); 
+Route::get('viewPickUp/{requisition_no}',[RequisitionController::class,'getviewPickList'])->name('viewPickUp');
+Route::get('/stock/print/{invoice}', [RequisitionController::class, 'printPickList'])
+    ->name('requisition.print');
+
+/* End of Issues*/
