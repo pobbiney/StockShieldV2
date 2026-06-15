@@ -1,4 +1,23 @@
 <!-- page title -->
+
+@php
+
+    $staff_query = DB::select('SELECT * FROM staff WHERE staff_id = :id', ['id' => auth()->user()->staff_id]);
+
+    $userCat = auth()->user()->user_cat;
+    $links = DB::select('SELECT user_links.link_id, user_links.page_id,user_links.page_id_sub, user_links.link_url, user_links.link_name, user_links.link_image, user_links.link_parent FROM user_cat_links INNER JOIN user_links ON user_cat_links.link_id = user_links.link_id WHERE user_cat_links.cat_id = :id ORDER BY user_links.link_name ASC',['id' => $userCat]);
+    $parents = array();
+    $child = array();
+    foreach ($links as $row_links) {
+        if ($row_links->link_parent == 0) {
+            $parents[] = $row_links;
+        } else {
+            $child[] = $row_links;
+        }
+    }
+
+    
+@endphp
 @php $pageName = "submenu"; $subpageName = "sub-menu"; @endphp
 
 @extends('layouts.backendapp')
@@ -34,7 +53,7 @@
                 <div class="card-header">
                     <div class="row gx-3 gx-lg-4 align-items-center">
                         <div class="col">
-                            <p class="h6">{{ $parent->link_name }}    </p>
+                            <p class="h6">{{$parent->link_name}}    </p>
                         </div>
                         <div class="col-auto">
                             <button type="button" class="btn btn-outline-theme btn-square" data-bs-toggle="collapse" data-bs-target="#collapse1" aria-expanded="false">
@@ -47,30 +66,20 @@
                 
                 <div class="card-body">  
                     <div class="row gx-3 gx-lg-4 justify-content-center">
-                            @if($list->count() > 0)
-
-                            @foreach ($list as $listall)
+                           @foreach($submenus as $submenu)
                                 <div class="col-12 col-md-3">
-                                    <a href="{{ route($listall->link_url) }}">
+                                    <a href="{{route($submenu->link_url)}}">
                                         <div class="card adminuiux-card shadow-sm text-center mb-3 mb-lg-4 bg-l-gradient-light bg-theme-1">
                                             <div class="card-body">
-                                                <i class="{{ $listall->link_image }} display-5 mb-3 d-block" style="color: white"></i>
-                                                <h5 class="mb-1">{{ $listall->link_name }}</h5>
+                                                <i class="{{ $submenu->link_image}} display-5 mb-3 d-block" style="color: white"></i>
+                                                <h5 class="mb-1">{{ $submenu->link_name}}</h5>
                                             </div>
                                         </div>
                                     </a>
                                 </div>
-                            @endforeach
-
-                        @else
-
-                            <div class="col-12">
-                                <div class="alert alert-danger text-center">
-                                    No Sub Menu Found.
-                                </div>
-                            </div>
-
-                        @endif
+                           
+                         @endforeach
+                         
                         
                     </div>
                            

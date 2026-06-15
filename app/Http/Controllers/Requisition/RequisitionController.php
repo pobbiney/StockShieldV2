@@ -18,7 +18,7 @@ class RequisitionController extends Controller
     public function getRequisitionView()
     {
          $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
-        $getItemid = Item::whereIn('store_id', $listdept)
+        $getItemid = Item::where('status', 'Active')
         ->where('status','Active')
         ->get(); // fix: whereIn + get()
         $liststore = Store::all();

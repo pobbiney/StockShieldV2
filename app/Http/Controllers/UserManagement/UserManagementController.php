@@ -11,12 +11,14 @@ use App\Models\User;
 use App\Models\UserCat;
 use App\Models\UserCatLink;
 use App\Models\UserLink;
-use Illuminate\Container\Attributes\Auth;
+ 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Support\Facades\Auth;
+
  
 
 class UserManagementController extends Controller implements HasMiddleware
@@ -404,10 +406,31 @@ class UserManagementController extends Controller implements HasMiddleware
     
     public function getSubmenuItems($id)
     {
-      $decodeID = Crypt::decrypt($id);
-      $list = UserLink::where('link_parent',$decodeID)->get();
-        $parent = UserLink::where('link_id',$decodeID)->first();
-      return view('layouts.submenu',['list'=>$list,'parent'=>$parent]);
+       $userCat = Auth::user()->user_cat;
+
+       $decodeID = Crypt::decrypt($id);
+
+    // Verify user has access to the parent menu
+    $parent = DB::table('user_cat_links')
+        ->join('user_links', 'user_cat_links.link_id', '=', 'user_links.link_id')
+        ->where('user_cat_links.cat_id', $userCat)
+        ->where('user_links.link_id', $decodeID)
+        ->first();
+
+    if (!$parent) {
+        abort(403, 'Unauthorized Access');
+    }
+
+    // Get only submenus assigned to this user category
+    $submenus = DB::table('user_cat_links')
+        ->join('user_links', 'user_cat_links.link_id', '=', 'user_links.link_id')
+        ->where('user_cat_links.cat_id', $userCat)
+        ->where('user_links.link_parent', $decodeID)
+        ->orderBy('user_links.link_name')
+        ->get();
+
+         return view('layouts.submenu', compact('parent', 'submenus'));
+       
     }
 
     public function getstoremappingvoew()
