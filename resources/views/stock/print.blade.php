@@ -475,7 +475,7 @@ tfoot td {
              <img src="{{asset('backend/assets/img/logo (2).png')}}" alt="" class="height-100 mb-3" width="70">
         </div>
         <div>
-          <div class="org-name">Korle Bu Teaching Hospital</div>
+          <div class="org-name">Supply & Logistics Department - KBTH</div>
           <div class="org-sub">Stock Shield </div>
         </div>
       </div>

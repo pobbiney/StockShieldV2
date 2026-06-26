@@ -24,55 +24,49 @@ class RequisitionController extends Controller
         $liststore = Store::all();
 
         
-          $listitemissue = ItemRequest::where('item_store_id',$listdept)
+          $listitemissue = ItemRequest::where('store_id',$listdept)
         ->where('status','pending')
         ->get();
          
         return view('requisition.Requisition', ['getItemid'=>$getItemid,'liststore'=>$liststore,'listitemissue'=>$listitemissue]);
     }
 
-        public function addRequest(Request $request)
-    {
-        $request->validate([
-            'item'      => 'required',
-            'quantity'  => 'required|numeric|min:1',
-        ]);
-          
-        // Check if item exists in approved stock table
-        $stocks = ApproveStock::where('status', 'approved')
-                    ->where('stock_id', $request->stock_id)
-                    ->get();
-
-        // If no stock found
-        if ($stocks->isEmpty()) {
-            return back()->with(
-                'message_error',
-                'Selected item has no Quantity.'
-            );
-        }
-
-          foreach ($stocks as $stock) {
-
-             $storeId = Auth::user()->department_id;
-
-            ItemRequest::create([
-                'stock_id'       => $stock->stock_id,
-                'item_id'        => $stock->item_id,
-                'batch_number'   => $request->batch_number,
-                'qty'            => $request->quantity,
-                'amount'         => $stock->amount,
-                'item_store_id'  => $stock->store_id,
-                'store_id'  => $storeId,
-                'created_by'     => Auth::id(),
+         public function addRequest(Request $request)
+        {
+            $request->validate([
+                'item'     => 'required',
+                'quantity' => 'required|numeric|min:1',
+                'stock_id' => 'required',
             ]);
 
+            $stock = ApproveStock::where('status', 'approved')
+                        ->where('stock_id', $request->stock_id)
+                        ->first();
+
+            
+
+            if (!$stock) {
+                return back()->with('message_error', 'Selected item has no Quantity.');
+            }
+
+            try {
+                ItemRequest::create([
+                    'stock_id'      => $stock->stock_id,
+                    'item_id'       => $stock->item_id,
+                    'batch_number'  => $request->batch_number,
+                    'qty'           => $request->quantity,
+                    'amount'        => $stock->amount,
+                    'item_store_id' => $stock->store_id,
+                    'store_id'      => Auth::user()->department_id,
+                    'created_by'    => Auth::user()->id,
+                ]);
+            } catch (\Exception $e) {
+                dd($e->getMessage());
+            }
+
+            return back()->with('message_success', 'Item successfully added');
         }
 
-        return back()->with(
-            'message_success',
-            'Item successfully added'
-        );
-    }
 
        public function deleteitemRequest(string $id)
     {
@@ -82,42 +76,42 @@ class RequisitionController extends Controller
         return redirect('Requisition')->with('message_success','Item deleted successfully!');
     }
 
-    public function submitRequest()
-    {
-        $storeId = Auth::user()->department_id;
-        $date = now()->format('Ymd');
+     public function submitRequest()
+{
+    $storeId = Auth::user()->department_id;
+    $date = now()->format('Ymd');
 
-        // Get the last requisition number today
-        $lastRecord = ItemRequest::whereDate('created_at', today())
-            ->whereNotNull('requisition_no')
-            ->latest('id')
-            ->first();
+    // Get the last requisition number today
+    $lastRecord = ItemRequest::whereDate('created_at', today())
+        ->whereNotNull('requisition_no')
+        ->latest('id')
+        ->first();
 
-        if ($lastRecord) {
-            $lastNumber = (int) substr($lastRecord->requisition_no, -4);
-        } else {
-            $lastNumber = 0;
-        }
-
-        $requests = ItemRequest::where('status', 'pending')
-            ->where('store_id', $storeId)
-            ->get();
-
-        foreach ($requests as $item) {  // ← don't reuse $request variable name
-            $lastNumber++;  // ← increment INSIDE the loop
-
-            $nextNumber = str_pad($lastNumber, 4, '0', STR_PAD_LEFT);
-            $requestNo  = 'REQ-' . $date . '-' . $nextNumber;
-
-            ItemRequest::where('id', $item->id)
-                ->update([
-                    'status'        => 'pending request',
-                    'requisition_no' => $requestNo,
-                ]);
-        }
-
-        return back()->with('message_success', 'Request submitted successfully');
+    if ($lastRecord) {
+        $lastNumber = (int) substr($lastRecord->requisition_no, -4);
+    } else {
+        $lastNumber = 0;
     }
+
+    // Generate ONE requisition number for all items
+    $nextNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
+    $requestNo  = 'REQ-' . $date . '-' . $nextNumber;
+
+    $requests = ItemRequest::where('status', 'pending')
+        ->where('store_id', $storeId)
+        ->get();
+
+    // Apply the SAME requisition number to all items
+    foreach ($requests as $item) {
+        ItemRequest::where('id', $item->id)
+            ->update([
+                'status'         => 'pending request',
+                'requisition_no' => $requestNo, // ← same number for all
+            ]);
+    }
+
+    return back()->with('message_success', 'Request submitted successfully');
+}
 
    public function getMyRequestView()
 {
@@ -136,17 +130,16 @@ public function getApproveRequestView()
 {
     $listdept = array_map('intval', explode('~', Auth::user()->department_id));
 
-  $listrequest = ItemRequest::where('store_id', $listdept)
-    ->whereIn('id', function ($query) use ($listdept) {
-        $query->selectRaw('MAX(id)')
-            ->from('item_requests')
-            ->where('store_id', $listdept)
-              ->where('status','pending request')
-            ->groupBy('requisition_no');
-    })
-    ->orderBy('id', 'DESC')
-    ->get();
- 
+    $listrequest = ItemRequest::whereIn('store_id', $listdept)
+        ->whereIn('id', function ($query) use ($listdept) {
+            $query->selectRaw('MAX(id)')
+                ->from('item_requests')
+                ->whereIn('store_id', $listdept)
+                ->where('status', 'pending request')
+                ->groupBy('requisition_no');
+        })
+        ->orderBy('id', 'DESC')
+        ->get();
 
     return view('requisition.ApproveRequest', ['listrequest' => $listrequest]);
 }

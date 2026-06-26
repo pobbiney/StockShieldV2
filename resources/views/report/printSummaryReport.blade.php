@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Issued Items Report</title>
+<title>Stock Received Items Report</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -481,7 +481,7 @@ tfoot td {
       </div>
     </div>
     <div class="report-title-block">
-      <div class="report-title">Issued Items Report</div>
+      <div class="report-title">Received Items Report</div>
       <div class="report-sub">Central   Stores Department</div>
     </div>
   </div>
@@ -549,76 +549,58 @@ tfoot td {
   </div> --}}
 
   <!-- TABLE -->
-  <div class="table">
-    <div class="table-header-bar">Issued Item Breakdown  </div>
+  <div class="table-section">
+    <div class="table-header-bar">Received Item Breakdown — Stock Items</div>
     <table>
-      <thead>
-            <tr>
-                <th>ID</th>
-                <th>Item Code</th>
-                <th >Item Name</th>
-                <th>UoM</th>
-                    
-                <th >Issuing Store </th>
-                <th >Receiving Store </th>
-                
-                
-                <th>Invoice No</th>
-                <th>Issued By</th>
-                <th>Date of Issue</th>
-                <th>Qty</th>
-                <th>Unit Cost</th>
-                <th>Amount</th>
-                
-                    
-            </tr>
-        </thead>
-    <tbody>
-            
-                @php  $grandTotal = 0; $totalqty = 0; @endphp
-            @foreach($liststock as $lists)
-            
-
-            @php
-                $lineTotal = $lists->amount * $lists->qty;
-                $grandTotal += $lineTotal;
-                $totalqty += $lists->qty;
-            @endphp
-            <tr>
-                <td>{{ $loop->iteration}}</td>
-                <td> {{ $lists->itemname->item_code }}</td>
-                <td>{{ $lists->itemname->name}}</td>
-                <td>{{ $lists->itemname->unitname->name}}</td>
-                
-                <td>{{ $lists->issuefrom->name}}</td>
-                <td>{{ $lists->storename->name}}</td>
-                
-                <td>{{ $lists->invoice_number}}</td>
-                <td>{{ $lists->staffname->name}}</td>
-                <td>{{ Carbon\Carbon::parse($lists->created_at)->format('F jS, Y \a\t h:i A') }} </td>
-                <td><b>{{ $lists->qty}}</b></td>
-                <td><b>{{ $lists->amount}}</b></td>
-                <td><b>{{ number_format($lineTotal,2)}}</b></td>
-                                                
-                
-        
-                
-                    
-            </tr>
-            @endforeach
-             
+       <thead>
+                                        <tr class="bg-l-gradient-light theme-green">
+                                          
+                                            <th>ID</th>
                                             
-      </tbody>
-      <tfoot>
-        <tr>
-          <td colspan="9"><b style="float: right">TOTAL</b></td>
-                                                <td><b>{{ $totalqty }}</b></td>
-                                                <td><b></b></td>
-                                                
-                                                <td><b>{{ number_format($grandTotal,2)}}</b></td>
-        </tr>
-      </tfoot>
-    </table>
+                                            <th>ITEM CODE</th>
+                                            <th >ITEM NAME</th>
+                                            <th>UoM</th>
+                                            <th>STOCK LEVEL</th>
+                                            <th>UNIT COST</th>
+                                            <th>TOTAL AMOUNT</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                            
+                                            
+                                            @foreach($liststock as $lists)
+                                            @php
+
+                                                $qty = $lists->approveStock->sum('qty');
+
+                                                $unitCost = $lists->approveStock->avg('amount');
+
+                                                $totalAmount = $lists->approveStock->sum(function($stock){
+                                                    return $stock->qty * $stock->amount;
+                                                });
+
+                                                $batchNumbers = $lists->approveStock
+                                                                    ->pluck('batch_number')
+                                                                    ->implode(', ');
+
+                                                $expiryDates = $lists->approveStock
+                                                                    ->pluck('expiry_date')
+                                                                    ->implode(', ');
+
+                                            @endphp
+                                            <tr>
+                                                <td>{{ $loop->iteration }}</td>
+                                                <td>{{ $lists->item_code }}</td>
+                                                <td>{{ $lists->name }}</td>
+                                                <td>{{ $lists->unitname->name ?? '' }}</td>
+                                                <td>{{ $qty ?? 0 }}</td>
+                                                <td>{{ number_format($unitCost ?? 0, 2) }}</td>
+                                                <td>{{ number_format($totalAmount ?? 0, 2) }}</td>
+                                            </tr>
+                                            @endforeach
+                                            
+                                    </tbody>
+                                </table>
   </div>
 
   <!-- SUMMARY -->

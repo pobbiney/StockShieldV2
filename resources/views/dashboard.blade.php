@@ -356,14 +356,14 @@
                                     </div>
                                 </div>
 
-                                <div class="row gx-3 gx-lg-4 mb-3 mb-lg-4">
+                                {{-- <div class="row gx-3 gx-lg-4 mb-3 mb-lg-4">
                                     <div class="col text-center py-3">
                                         <h4>The sort <span class="text-gradient">summary</span> may help you</h4>
                                         <p class="text-secondary">Keep yourself updated, No matter how much workload is.</p>
                                     </div>
-                                </div>
+                                </div> --}}
 
-                                <div class="row gx-3 gx-lg-4">
+                                {{-- <div class="row gx-3 gx-lg-4">
                                     <div class="col-12 col-md-6 col-lg-6 col-xxl-3 mb-3 mb-lg-4">
                                         <!-- finance card -->
                                         <div class="card adminuiux-card shadow-sm bg-l-gradient-light theme-blue">
@@ -744,7 +744,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                </div> --}}
 
                                
                              

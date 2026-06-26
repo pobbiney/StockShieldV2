@@ -815,5 +815,27 @@ public function searchStockLevelReport(Request $request)
     }
 
 
+     public function printSummaryReport(Request $request)
+    {
+        
+      $liststores = Store::all();
+
+        // Search Item
+     $liststock = Item::with(['approveStock'])
+    ->where('status', 'Active')
+    ->where('store_id', $request->department)
+    ->get();
+
+     return view(
+        'report.printSummaryReport',
+        compact('liststock', 'store','liststores', 'startDate',
+            'endDate','getItemid')
+    );
+
+        
+        
+    
+    }
+
 
 }

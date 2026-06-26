@@ -80,7 +80,7 @@
                         <hr/>
 
                         @if(isset($liststock) && $liststock->count() > 0)
-                        
+                         
                           <div class="table-responsive">
                             
                                 <table  class="table table-bordered "  >
