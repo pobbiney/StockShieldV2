@@ -4,23 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class ApproveStock extends Model
+class ReturnItem extends Model
 {
-    protected $fillable = [
-    'stock_id',
-    'item_id',
-    'batch_number',
-    'expiry_date',
-    'qty',
-    'amount',
-    'purchase_order',
-    'supplier_id',
-    'store_id',
-    'status',
-    'created_by',
-];
-
-  public function itemcode()
+    public function itemcode()
 	{
 		return $this->belongsTo(Item::class, 'item_id' ,'id'); // 'itemID' is the foreign key
 	}
@@ -47,6 +33,11 @@ class ApproveStock extends Model
 	 public function staffname()
 	{
 		return $this->belongsTo(User::class, 'created_by' ,'id'); // 'itemID' is the foreign key
+	}
+
+    public function stockdetails()
+	{
+		return $this->belongsTo(ApproveStock::class, 'batch_number' ,'batch_number'); // 'itemID' is the foreign key
 	}
 
 }

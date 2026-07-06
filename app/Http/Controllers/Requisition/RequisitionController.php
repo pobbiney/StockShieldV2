@@ -7,11 +7,14 @@ use App\Models\ApproveStock;
 use App\Models\Item;
 use App\Models\ItemIssue;
 use App\Models\ItemRequest;
+use App\Models\ReturnItem;
+use App\Models\Stock;
 use App\Models\Store;
 use App\Models\UnitOfMeasure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 
 class RequisitionController extends Controller
 {
@@ -269,4 +272,110 @@ public function getApproveRequestView()
     return view('requisition.print', compact('issues', 'decodeID', 'store', 'issueto', 'listissues'));
 }
     
+
+    public function getReturnView()
+    {
+
+      $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
+       
+         
+        $liststock = ApproveStock::whereIn('store_id',$listdept)
+        ->where('status','approved')
+        ->orderBy('id','DESC')
+        ->get();
+    return view('requisition.Return',['liststock'=>$liststock]);
+    }
+
+     public function getreturnItemID($id)
+    {
+         $data = ApproveStock::findOrFail($id);
+          return response()->json($data);
+    }
+
+     public function addReturn(Request $request)
+    {
+         $request->validate([
+            'quantity' =>'required',
+            'comment' =>'required',
+            'return_status' =>'required'
+           
+        ]);
+
+       
+            $insertCat = new ReturnItem();
+            
+            $insertCat->item_id = trim($request->item_id);
+            $insertCat->batch_number = trim($request->batch_number);
+            $insertCat->quantity = trim($request->quantity);
+            $insertCat->manager_comment = trim($request->comment);
+            $insertCat->return_status = trim($request->return_status);
+            $insertCat->returned_by = Auth::User()->id;
+            $status = $insertCat->save();
+
+              // Update original stock table
+           ApproveStock::where('batch_number', $request->batch_number)
+            ->update([
+                'status' => 'return initiated'
+            ]);
+
+            return $status ? back()->with('message_success','Process initiated successfully, Please wait for approval') : back()->with('message_error','Something went wrong, please try again.');
+    }
+
+    public function getReturnApprovalView()
+    {
+          
+        $listItem = ReturnItem::where('status','return initiated')
+        
+        ->orderBy('id','DESC')
+        ->get();
+
+        
+    return view('requisition.ReturnApproval',['listItem'=>$listItem]);
+    }
+
+     
+
+     public function getreturnItemApprovalID($id)
+    {
+         $data = ReturnItem::findOrFail($id);
+          return response()->json($data);
+    }
+
+    public function addReturnApproval(Request $request)
+{
+    $request->validate([
+        'comment' => 'required|string',
+        'status' => 'required|string',
+        'item_id' => 'required|exists:return_items,id',
+        'batch_number' => 'required|exists:approve_stocks,batch_number',
+        'qty' => 'required|numeric|min:0.01',
+    ]);
+
+    try {
+        DB::transaction(function () use ($request) {
+            $insertCat = ReturnItem::findOrFail($request->item_id);
+            $insertCat->status = 'approved';
+            $insertCat->hod_comment = trim($request->comment);
+            $insertCat->approved_by_hod = Auth::id();
+            $insertCat->save();
+
+            $data = ApproveStock::where('batch_number', $request->batch_number)->firstOrFail();
+
+            if ($request->qty < $data->qty) {
+                $data->update([
+                    'qty' => $data->qty - $request->qty,
+                    'status' => 'returned',
+                ]);
+            } else {
+                $data->update([
+                     'status' => 'returned',
+                ]);
+            }
+        });
+    } catch (\Exception $e) {
+        return back()->with('message_error', 'Something went wrong, please try again.');
+    }
+
+    return back()->with('message_success', 'Process approved successfully');
+}
 }

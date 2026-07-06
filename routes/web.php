@@ -238,4 +238,11 @@ Route::get('viewPickUp/{requisition_no}',[RequisitionController::class,'getviewP
 Route::get('/stock/print/{invoice}', [RequisitionController::class, 'printPickList'])
     ->name('requisition.print');
 
+Route::get('Return',[RequisitionController::class,'getReturnView'])->name('Return'); 
+Route::get('return-item-id/{id}',[RequisitionController::class,'getreturnItemID'])->name('return-item-id');
+Route::post('add-retrun-item-process', [RequisitionController::class, 'addReturn'])->name('add-retrun-item-process');
+Route::get('ReturnApproval',[RequisitionController::class,'getReturnApprovalView'])->name('ReturnApproval'); 
+Route::post('add-retrun-item-approval-process', [RequisitionController::class, 'addReturnApproval'])->name('add-retrun-item-approval-process');
+Route::get('return-item-approval-id/{id}',[RequisitionController::class,'getreturnItemApprovalID'])->name('return-item-approval-id');
+
 /* End of Issues*/
