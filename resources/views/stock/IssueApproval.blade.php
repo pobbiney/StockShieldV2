@@ -42,110 +42,31 @@
             <hr/>
             
             <div class="card-body">
-                  @if(isset($listissues))
-                            @if($listissues->count() > 0)
-                                <div class="alert alert-success mt-2">
-                                    {{ $listissues->count() }} result(s) found
-                                </div>
-                            @else
-                                <div class="alert alert-danger mt-2">
-                                    No results found
-                                </div>
-                            @endif
-                        @endif
-
-                        
-                        <form id="form" enctype="multipart/form-data" method="POST" action="{{ route('stock.search-issues') }}">
-                            @csrf
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group mb-3 position-relative check-valid">
-                                        <div class="form-floating">
-                                            <select class="form-control " name="department">
-                                                    <option value="" selected disabled>--Select Department--</option>
-                                            @foreach ($liststores as $cat)
-                                            <option value="{{ $cat->id }}">{{ $cat->name }}</option>
-                                            @endforeach
-                                            
-                                            </select>
-                                            @error('department') <small style="color:red"> {{ $message}}</small> @enderror
-                                        </div>
-                                    </div>
-                                </div>
-                              
-                                 
-                                <div class="col-md-1">
-                                    <button type="submit" name="find" id="find" class="btn btn-success btn-lg" ><i class="fa fa-search"></i> Search</button>
-                                </div>
-                            </div>
-                        </form>
-                        <hr/>
-
-                        @if(isset($listissues) && $listissues->count() > 0)
-                        <form  id="approveForm" method="POST" action="{{ route('approveIssue-process') }}" target="_" >
-                            @csrf
-                          <div class="table-responsive">
-                            
-                                <table  class="table table-bordered "  >
+                    <table  class="display" id="myTable">
                                     <thead>
-                                        <tr class="bg-l-gradient-light theme-green">
-                                          
+                                        <tr>
                                             <th>ID</th>
-                                            
-                                            <th>Item Code</th>
-                                            <th >Item Name</th>
-                                            <th>Batch Number</th>
-                                            
-                                            <th>Qty</th>
-                                            <th>Cost</th>
-                                            <th>Requisition No  </th>
-                                            <th>Issue To</th>
-                                            <th>Action</th>
-                                              
-                                            
-                                                
+                                            <th>Description</th>
+                                            <th>Status</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                             
-                                            
+                                         
                                             @foreach($listissues as $lists)
                                             <tr>
-                                                  
-                                                <td>{{ $loop->iteration}}  <input type="hidden"
-                                                    name="issue_id[]"
-                                                    value="{{ $lists->id }}"></td>
-                                                 
-                                                <td> {{ $lists->itemcode->item_code }}</td>
-                                                <td>{{ $lists->itemname->name}}</td>
-                                                <td>{{$lists->batch_number}}</td>
+                                                <td>{{ $loop->iteration}}</td>
+                                                <td> Request has been made by {{ $lists->staffname->name}} with Requisition Number <b>{{ $lists->requisition_no}}</b></td>
+                                                <td><a href="{{ route('viewIssues', Crypt::encrypt($lists->requisition_no)) }}" class="btn btn-success"><i class="fa fa-eye"></i> Open Request </a></td>
                                                
-                                                <td style="width: 120px"><input type="number" name="qty[{{ $lists->id }}]" class="form-control" value="{{$lists->qty}}"/></td>
-                                                <td> {{ number_format($lists->amount,2)}}</td>
-                                                <td> {{$lists->requisition_no}}</td>
-                                                <td> {{$lists->storename->name}}</td>
-                                                <td><a href="" class="btn btn-sm btn-danger showmodal"  data-url="{{ route('issue-item-id',$lists->id)  }}" data-bs-toggle="modal" data-bs-target="#standardmodal" ><i class="fa fa-times"></i> Reject</a></td>
-                                                
-                                            </tr>
+                                                     
+                                            </tr> 
                                                 
                                             
-                                            @endforeach
+                                            @endforeach 
                                             
                                     </tbody>
                                 </table>
-                             
-                                @if($listissues->isNotEmpty())
-                                    <input type="hidden" name="store_id" value="{{ $listissues->first()->issue_to }}"/>
-                                    
-                                    <button type="submit" class="btn btn-info" 
-                                        onclick="return confirm('Are you sure you want to approve all Issues?')">
-                                        <i class="fa fa-check-circle"></i> Approve All
-                                    </button>
-                                @endif  
-                            </div>
-                             
-                        </form>
-                            @endif
             </div>
         
         </div>

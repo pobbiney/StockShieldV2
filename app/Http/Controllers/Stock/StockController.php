@@ -567,7 +567,7 @@ class StockController extends Controller
         return response()->json([
             'batch_number' => $stock->batch_number,
             'store_id' => $stock->store_id,
-            'stock_id'     => $stock->id,
+            'stock_id'     => $stock->stock_id,
             'qty'          => $stock->qty,
             'expiry_date'  => $stock->expiry_date
         ]);
@@ -673,8 +673,22 @@ class StockController extends Controller
 
    public function getIssueApproval()
    {
-     $liststores = Store::all();
-        return view('stock.IssueApproval', [  'liststores'=>$liststores]);
+
+   $listdept = array_map('intval', explode('~', Auth::user()->department_id));
+
+    $listissues= ItemIssue::whereIn('store_id', $listdept)
+        ->whereIn('id', function ($query) use ($listdept) {
+            $query->selectRaw('MAX(id)')
+                ->from('item_issues')
+                ->whereIn('store_id', $listdept)
+                ->where('status', 'pending')
+                ->groupBy('requisition_no');
+        })
+        ->orderBy('id', 'DESC')
+        ->get();
+
+    return view('stock.IssueApproval', ['listissues' => $listissues]);
+    
    }
 
         public function searchIssues(Request $request)

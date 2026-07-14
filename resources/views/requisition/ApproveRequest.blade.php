@@ -74,12 +74,7 @@
                                         <tr>
                                             <th>ID</th>
                                             <th>Description</th>
-                                          
-                                            
                                             <th>Status</th>
-                                           
-                                           
-                                                
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -99,10 +94,6 @@
                                             
                                     </tbody>
                                 </table>
-                             
-                               
-                                
-                          
                         </div>
                     </div>
                 </div>

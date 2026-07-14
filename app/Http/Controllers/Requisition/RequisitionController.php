@@ -153,7 +153,7 @@ public function getApproveRequestView()
 
     $decodeID = Crypt::decrypt($requisition_no);
 
-        $listrequest = ItemRequest::where('store_id', $listdept)
+        $listrequest = ItemRequest::whereIn('store_id', $listdept)
         ->where('requisition_no',$decodeID)
         ->where('status','pending request')
             ->orderBy('id', 'DESC')
@@ -378,4 +378,20 @@ public function getApproveRequestView()
 
     return back()->with('message_success', 'Process approved successfully');
 }
+
+ public function getIssuedItems($requisition_no)
+    {
+        $listdept = array_map('intval', explode('~', Auth::user()->department_id));
+
+    $decodeID = Crypt::decrypt($requisition_no);
+
+        $listissues = ItemIssue::whereIn('store_id', $listdept)
+        ->where('requisition_no',$decodeID)
+        ->where('status','pending')
+            ->orderBy('id', 'DESC')
+            ->get();
+    
+
+        return view('requisition.viewIssues', ['listissues' => $listissues]);
+    }
 }

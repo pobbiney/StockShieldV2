@@ -75,7 +75,17 @@ class StaffController extends Controller
     public function getSupplierView()
     {
         $list =  Supplier::all();
-         return view('staff-management.Supplier',['list'=>$list]);
+          // Generate Item Code
+        $lastItem = Supplier::latest('id')->first();
+
+        if($lastItem){
+            $number = $lastItem->id + 1;
+        } else {
+            $number = 1;
+        }
+
+        $supCode = 'SUP-' . str_pad($number, 5, '0', STR_PAD_LEFT);
+         return view('staff-management.Supplier',['list'=>$list,'supCode'=>$supCode]);
     }
 
      //Adding supplier to database
@@ -85,12 +95,12 @@ class StaffController extends Controller
         'code' => 'required',
         'supplier' => 'required',
         'phone' => 'required',
-        'email' => 'required|email',
+        // 'email' => 'required|email',
         'company' => 'required',
          
         'city' => 'required',
-        'tin_number' => 'required',
-        'registration_number' => 'required',
+        // 'tin_number' => 'required',
+        // 'registration_number' => 'required',
         'address' => 'required',
         'status' => 'required',
     ]);

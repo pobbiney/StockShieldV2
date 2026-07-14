@@ -13,7 +13,7 @@
                             <div class="col-md-4">
                                 <div class="form-group mb-3 position-relative check-valid">
                                     <div class="form-floating">
-                                        <input type="text" name="code" class="form-control"    placeholder="Enter Supplier's Code">
+                                        <input type="text" name="code" class="form-control"    placeholder="Enter Supplier's Code" value="{{ $supCode}}">
                                         <label>Supplier's Code</label>
                                         @error('code') <small style="color:red"> {{ $message}}</small> @enderror
                                     </div>
@@ -44,7 +44,7 @@
                                     <div class="form-floating">
                                         <input type="text" name="email" class="form-control"   placeholder="Enter Email Address">
                                         <label>Email Address</label>
-                                        @error('email') <small style="color:red"> {{ $message}}</small> @enderror
+                                        <!-- @error('email') <small style="color:red"> {{ $message}}</small> @enderror -->
                                     </div>
                                 </div>
                             </div>
@@ -74,9 +74,9 @@
                                 <div class="form-group mb-3 position-relative check-valid">
                                     <div class="form-floating">
                                         
-                                        <input type="text" name="tin_number" class="form-control"    placeholder="Enter VAT Number">
+                                        <input type="text" name="tin_number" class="form-control"    placeholder="Enter TIN Number">
                                         <label>TIN</label>
-                                        @error('tin_number') <small style="color:red"> {{ $message}}</small> @enderror
+                                        <!-- @error('tin_number') <small style="color:red"> {{ $message}}</small> @enderror -->
                                     </div>
                                 </div>
                             </div>
@@ -86,7 +86,7 @@
                                         
                                         <input type="text" name="registration_number" class="form-control"    placeholder="Enter Company Registration Number">
                                         <label>Company Registration Number</label>
-                                        @error('registration_number') <small style="color:red"> {{ $message}}</small> @enderror
+                                        <!-- @error('registration_number') <small style="color:red"> {{ $message}}</small> @enderror -->
                                     </div>
                                 </div>
                             </div>

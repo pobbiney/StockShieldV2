@@ -142,6 +142,8 @@ Route::get('/approve-all-issues', [StockController::class, 'approveAllIssues'])
 Route::get('IssueApproval',[StockController::class,'getIssueApproval'])->name('IssueApproval');
 Route::post('IssueApproval',[StockController::class,'searchIssues'])->name('stock.search-issues');
 
+
+
 Route::post('approveIssue-process', [StockController::class, 'ApproveIssueIndv'])->name('approveIssue-process');
 Route::get('/stock/prints/{invoice}', [StockController::class, 'printIssue'])
     ->name('stock.print');
@@ -226,6 +228,9 @@ Route::get('viewRequest/{requisition_no}',[RequisitionController::class,'getview
 Route::get('request-item-id/{id}',[RequisitionController::class,'getrequesttemID'])->name('request-item-id');
 Route::post('add-reject-request-process', [RequisitionController::class, 'addItemRejectRequest'])->name('add-reject-request-process');
 Route::post('approve-request-process', [RequisitionController::class, 'addApproveRequest'])->name('approve-request-process');
+
+Route::get('viewIssues/{requisition_no}',[RequisitionController::class,'getIssuedItems'])->name('viewIssues');
+Route::post('approve-issues-process', [RequisitionController::class, 'addApproveIssues'])->name('approve-issues-process');
 
 
 /* End of Requisition */
