@@ -109,6 +109,7 @@
                                                         <option value="" selected disabled>--Choose  Title--</option>
                                                         <option value="Mr">Mr</option>
                                                         <option value="Mrs">Mrs</option>
+                                                        <option value="Miss">Miss</option>
                                                         <option value="Dr">Dr</option>
                                                         <option value="Prof">Prof</option>
                                                     </select>

@@ -139,6 +139,11 @@
                                 </div>
                            </div>
                     </div>
+                    <div class="row" style="margin-bottom: 15px;">
+                    <div class="col-md-6">
+                        <textarea class="form-control" id="skcomment" name="comment" placeholder="Please Enter Comment if any" ></textarea>
+                    </div>
+                </div><br/>
                 </div>
                     
                 </div>

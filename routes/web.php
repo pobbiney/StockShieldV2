@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Authentication\AuthenticationController;
 use App\Http\Controllers\Dashboard\DashboardController;
 use App\Http\Controllers\Issues\IssueController;
+use App\Http\Controllers\notification\NotificationController;
 use App\Http\Controllers\Report\ReportController;
 use App\Http\Controllers\Report\ReportDetailsController;
 use App\Http\Controllers\Requisition\RequisitionController;
@@ -249,5 +250,8 @@ Route::post('add-retrun-item-process', [RequisitionController::class, 'addReturn
 Route::get('ReturnApproval',[RequisitionController::class,'getReturnApprovalView'])->name('ReturnApproval'); 
 Route::post('add-retrun-item-approval-process', [RequisitionController::class, 'addReturnApproval'])->name('add-retrun-item-approval-process');
 Route::get('return-item-approval-id/{id}',[RequisitionController::class,'getreturnItemApprovalID'])->name('return-item-approval-id');
+
+// routes/web.php
+Route::get('check-notifications', [NotificationController::class, 'checkNew'])->name('check-notifications');
 
 /* End of Issues*/

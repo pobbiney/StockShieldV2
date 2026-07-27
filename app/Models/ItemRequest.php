@@ -20,6 +20,8 @@ class ItemRequest extends Model
     'created_by',
 	'store_id',
 
+	'qty_requested',
+
     
 ];
 

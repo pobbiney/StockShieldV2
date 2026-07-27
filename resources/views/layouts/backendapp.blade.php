@@ -714,6 +714,54 @@ Swal.fire({
 });
 </script>
 
+<script>
+
+  // Ask for notification permission once, if not already granted/denied
+if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+    Notification.requestPermission();
+}
+
+let lastSeenId = localStorage.getItem('lastSeenNotificationId') || 0;
+
+function checkForNewRequests() {
+    $.ajax({
+        url: "{{ route('check-notifications') }}",
+        type: "GET",
+        data: { last_id: lastSeenId },
+        success: function (response) {
+            if (response.count > 0) {
+
+                response.notifications.forEach(function (note) {
+                    showDesktopNotification(note.title, note.message);
+                });
+
+                updateNotificationBadge(response.count);
+            }
+
+            lastSeenId = response.latest_id;
+            localStorage.setItem('lastSeenNotificationId', lastSeenId);
+        }
+    });
+}
+
+function showDesktopNotification(title, body) {
+    if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title, { body: body });
+    }
+}
+
+function updateNotificationBadge(count) {
+    let badge = $('#notif-badge');
+    if (badge.length) {
+        let current = parseInt(badge.text()) || 0;
+        badge.text(current + count).removeClass('d-none');
+    }
+}
+
+setInterval(checkForNewRequests, 10000);
+$(document).ready(checkForNewRequests);
+</script>
+
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css">
 
 <script src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>

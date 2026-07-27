@@ -70,7 +70,7 @@
                             <div class="table-responsive">
                                <form enctype="multipart/form-data" method="POST" action="{{ route('approve-request-process') }}" >
                                 @csrf
-                                <table  class="display" id="myTable">
+                                <table  class="table table-bordered"  >
                                     <thead>
                                         <tr>
                                             <th>ID</th>
@@ -79,7 +79,7 @@
                                             <th>UoM</th>
                                             <th>Batch Number</th>
                                            
-                                            <th>Qty</th>
+                                            <th>Requested Qty</th>
                                             <th>Unit Cost</th>
                                             <th>Requisition No</th>
                                             
@@ -103,7 +103,7 @@
                                                 <td>{{$lists->itemname->unitname->name }}</td>
                                                 <td>{{$lists->batch_number}}</td>
                                                
-                                                <td><input type="number" name="qty[{{ $lists->id }}]" class="form-control" value="{{$lists->qty}}"/></td>
+                                                <td><input type="number" name="qty[{{ $lists->id }}]" class="form-control" value="{{$lists->qty_requested}}"/></td>
                                                 <td> {{$lists->amount}}</td>
                                                 <td> {{$lists->requisition_no}}</td>
                                                 <td> {{$lists->status}}</td>
