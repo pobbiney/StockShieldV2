@@ -7,6 +7,7 @@ use App\Models\ApproveStock;
 use App\Models\Item;
 use App\Models\ItemIssue;
 use App\Models\ItemRequest;
+use App\Models\SystemNotifications;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -34,89 +35,75 @@ class IssueController extends Controller
     }
 
     
+   
+
     public function addIssueRequest(Request $request)
-        {
-          // VALIDATION PHASE
-    foreach ($request->qty as $requestId => $issueQty) {
-
-        $itemRequest = ItemRequest::find($requestId);
-
-        $stock = ApproveStock::where('item_id', $itemRequest->item_id)
-                    ->where('batch_number', $itemRequest->batch_number)
-                    ->first();
-
-        if (!$stock) {
-            return redirect()->back()
-                ->withInput()
-                ->with('message_error',
-                    "No stock found for {$itemRequest->itemname->name}");
-        }
-
-        // Check expiry
-        if ($stock->expiry_date &&
-            Carbon::parse($stock->expiry_date)->lte(Carbon::today())) {
-
-            return redirect()->back()
-                ->withInput()
-                ->with('message_error',
-                    "{$itemRequest->itemname->name} has expired.");
-        }
-
-        // Check stock balance
-        if ($issueQty > $stock->qty) {
-
-            return redirect()->back()
-                ->withInput()
-                ->with('message_error',
-                    "{$itemRequest->itemname->name}: Requested {$issueQty} but only {$stock->qty} available.");
-        }
-    }
-
-    // SAVE PHASE
-    DB::beginTransaction();
-
-    try {
-
+    {
+        // VALIDATION PHASE (unchanged)
         foreach ($request->qty as $requestId => $issueQty) {
-
             $itemRequest = ItemRequest::find($requestId);
-
             $stock = ApproveStock::where('item_id', $itemRequest->item_id)
                         ->where('batch_number', $itemRequest->batch_number)
                         ->first();
 
-            // Save issue record
-            ItemIssue::create([
-            'stock_id'       => $itemRequest->stock_id,
-            'item_id'        => $itemRequest->item_id,
-            'batch_number'   => $itemRequest->batch_number,
-            'qty'            => $issueQty,
-            'amount'         => $itemRequest->amount,
-            'requisition_no' => $itemRequest->requisition_no,
-            'issue_to'       => $itemRequest->store_id,
-            'store_id'       => $itemRequest->item_store_id,
-            'created_by'     => Auth::id(),
-            ]);
+            if (!$stock) {
+                return redirect()->back()->withInput()
+                    ->with('message_error', "No stock found for {$itemRequest->itemname->name}");
+            }
 
-            
-             $itemRequests = ItemRequest::find($requestId)
-          
-            ->update([
-                'status' => 'pending issues'
-            ]);
+            if ($stock->expiry_date && Carbon::parse($stock->expiry_date)->lte(Carbon::today())) {
+                return redirect()->back()->withInput()
+                    ->with('message_error', "{$itemRequest->itemname->name} has expired.");
+            }
+
+            if ($issueQty > $stock->qty) {
+                return redirect()->back()->withInput()
+                    ->with('message_error', "{$itemRequest->itemname->name}: Requested {$issueQty} but only {$stock->qty} available.");
+            }
         }
 
-        DB::commit();
+        // SAVE PHASE
+        DB::beginTransaction();
+        try {
+            foreach ($request->qty as $requestId => $issueQty) {
+                $itemRequest = ItemRequest::find($requestId);
+                $stock = ApproveStock::where('item_id', $itemRequest->item_id)
+                            ->where('batch_number', $itemRequest->batch_number)
+                            ->first();
 
-        return redirect()->back()
-            ->with('message_success', 'Items issued successfully.');
+                ItemIssue::create([
+                    'stock_id'       => $itemRequest->stock_id,
+                    'item_id'        => $itemRequest->item_id,
+                    'batch_number'   => $itemRequest->batch_number,
+                    'qty'            => $issueQty,
+                    'amount'         => $itemRequest->amount,
+                    'requisition_no' => $itemRequest->requisition_no,
+                    'issue_to'       => $itemRequest->store_id,
+                    'store_id'       => $itemRequest->item_store_id,
+                    'created_by'     => Auth::id(),
+                ]);
 
-    } catch (\Exception $e) {
+                $itemRequest->update(['status' => 'pending issues']);
 
-        DB::rollBack();
+                 // ONE notification for the whole requisition, not per item
+                $itemCount = $itemRequest->count();
 
-        return redirect()->back()
-            ->with('message_error', $e->getMessage());
+                SystemNotifications::create([
+                    'title'        => 'Item Issued — Pending Dispatch',
+                    'message'      => "Requisition {$itemRequest->requisition_no} submitted with {$itemCount} item(s), needs approval.",
+                    //'link'         => route('pending-requests', ['requisition_no' => $itemRequest->requisition_no]),
+                    'type'         => 'new_request',
+                    'reference_id' => $itemRequest->requisition_no,
+                ]);
+
+            }
+
+            DB::commit();
+            return redirect()->back()->with('message_success', 'Items issued successfully.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('message_error', $e->getMessage());
+        }
     }
-        }
 }

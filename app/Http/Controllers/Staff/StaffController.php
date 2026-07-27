@@ -34,11 +34,11 @@ class StaffController extends Controller
         ]);
 
 
-        if(Staff::where('employee_id',$request->staff_number)->get()->count() > 0){
+        // if(Staff::where('employee_id',$request->staff_number)->get()->count() > 0){
 
-            return back()->with('message_error','Record already exist');
+        //     return back()->with('message_error','Record already exist');
 
-        }else{
+        // }else{
 
         $insertstaff = new Staff();
         if($request->hasFile('image')){
@@ -68,7 +68,7 @@ class StaffController extends Controller
         return $status 
             ? back()->with('message_success','Staff added successfully') 
             : back()->with('error_message','Something went wrong, please try again.');
-    }
+    
 
     }
 

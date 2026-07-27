@@ -207,34 +207,51 @@
 </script>
 
 <script>
-    $('#item_id').on('change', function () {
+   $('#item_id').on('change', function () {
 
-        let itemId = $(this).val();
+    let itemId = $(this).val();
 
-        $.ajax({
-            url: "{{ route('get.batch.number') }}",
-            type: "POST",
-            data: {
-                getID: itemId,
-                _token: "{{ csrf_token() }}"
-            },
+    $.ajax({
+        url: "{{ route('get.batch.number') }}",
+        type: "POST",
+        data: {
+            getID: itemId,
+            _token: "{{ csrf_token() }}"
+        },
 
-            success: function (response) {
+        success: function (response) {
 
-                if (response.batch_number) {
-                    $('#batch_number').val(response.batch_number);
-                     $('#store_id').val(response.store_id);
-                    $('#stock_id').val(response.stock_id);
-                    $('#qty').text(response.qty);
-                } else {
-                    $('#batch_number').val('');
-                    $('#stock_id').val('');
-                     $('#qty').val('');
-                }
+            if (response.batch_number) {
+                $('#batch_number').val(response.batch_number);
+                $('#store_id').val(response.store_id);
+                $('#stock_id').val(response.stock_id);
+                $('#qty').text(response.qty);
+            } else {
+                $('#batch_number').val('');
+                $('#stock_id').val('');
+                $('#store_id').val('');
+
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No Stock Available',
+                    text: response.message || 'No stock available for this item',
+                    confirmButtonColor: '#d33'
+                });
+
+                // Optional: reset the dropdown back to placeholder
+                $('#item_id').val('').trigger('change');
             }
-        });
-
+        },
+        error: function () {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Something went wrong while checking stock.'
+            });
+        }
     });
+
+});
 </script>
     
 @endsection

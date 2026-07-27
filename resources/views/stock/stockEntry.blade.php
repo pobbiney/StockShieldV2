@@ -194,6 +194,11 @@
                            </div>
                     </div>
                 </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <textarea class="form-control" name="comment" placeholder="Please Enter Comment if any" ></textarea>
+                    </div>
+                </div><br/>
                 <div class="mb-3">
                     <button type="submit" class="btn btn-success">Add New Stock </button>
                 </div>

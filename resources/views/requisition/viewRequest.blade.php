@@ -70,7 +70,7 @@
                             <div class="table-responsive">
                                <form enctype="multipart/form-data" method="POST" action="{{ route('approve-request-process') }}" >
                                 @csrf
-                                <table  class="display" id="myTable">
+                                <table  class="table table-bordered"  >
                                     <thead>
                                         <tr>
                                             <th>ID</th>

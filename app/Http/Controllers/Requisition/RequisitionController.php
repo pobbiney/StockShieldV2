@@ -10,6 +10,7 @@ use App\Models\ItemRequest;
 use App\Models\ReturnItem;
 use App\Models\Stock;
 use App\Models\Store;
+use App\Models\SystemNotifications;
 use App\Models\UnitOfMeasure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -63,6 +64,9 @@ class RequisitionController extends Controller
                     'store_id'      => Auth::user()->department_id,
                     'created_by'    => Auth::user()->id,
                 ]);
+
+             
+
             } catch (\Exception $e) {
                 dd($e->getMessage());
             }
@@ -84,19 +88,13 @@ class RequisitionController extends Controller
     $storeId = Auth::user()->department_id;
     $date = now()->format('Ymd');
 
-    // Get the last requisition number today
     $lastRecord = ItemRequest::whereDate('created_at', today())
         ->whereNotNull('requisition_no')
         ->latest('id')
         ->first();
 
-    if ($lastRecord) {
-        $lastNumber = (int) substr($lastRecord->requisition_no, -4);
-    } else {
-        $lastNumber = 0;
-    }
+    $lastNumber = $lastRecord ? (int) substr($lastRecord->requisition_no, -4) : 0;
 
-    // Generate ONE requisition number for all items
     $nextNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
     $requestNo  = 'REQ-' . $date . '-' . $nextNumber;
 
@@ -104,14 +102,27 @@ class RequisitionController extends Controller
         ->where('store_id', $storeId)
         ->get();
 
-    // Apply the SAME requisition number to all items
-    foreach ($requests as $item) {
-        ItemRequest::where('id', $item->id)
-            ->update([
-                'status'         => 'pending request',
-                'requisition_no' => $requestNo, // ← same number for all
-            ]);
+    if ($requests->isEmpty()) {
+        return back()->with('message_error', 'No pending items to submit.');
     }
+
+    foreach ($requests as $item) {
+        $item->update([
+            'status'         => 'pending request',
+            'requisition_no' => $requestNo,
+        ]);
+    }
+
+    // ONE notification for the whole requisition, not per item
+    $itemCount = $requests->count();
+
+    SystemNotifications::create([
+        'title'        => 'New Item Request',
+        'message'      => "Requisition {$requestNo} submitted with {$itemCount} item(s), needs approval.",
+        //'link'         => route('pending-requests', ['requisition_no' => $requestNo]),
+        'type'         => 'new_request',
+        'reference_id' => $requestNo,
+    ]);
 
     return back()->with('message_success', 'Request submitted successfully');
 }
@@ -258,7 +269,10 @@ public function getApproveRequestView()
         return redirect()->back()->with('message_error', 'Invalid invoice reference.');
     }
 
-    $issues = ItemIssue::where('invoice_number', $decodeID)->first();
+    $issues = ItemIssue::where('invoice_number', $decodeID)->
+    where('store_id', Auth::user()->department_id)->
+
+    first();
 
     if (!$issues) {
         return redirect()->back()->with('message_error', 'Invoice not found.');
@@ -267,7 +281,7 @@ public function getApproveRequestView()
     $store   = Store::find($issues->store_id);
     $issueto = Store::find($issues->issue_to);
 
-    $listissues = ItemIssue::where('invoice_number', $decodeID)->get();
+    $listissues = ItemIssue::where('invoice_number', $decodeID)->where('store_id', Auth::user()->department_id)->get();
 
     return view('requisition.print', compact('issues', 'decodeID', 'store', 'issueto', 'listissues'));
 }

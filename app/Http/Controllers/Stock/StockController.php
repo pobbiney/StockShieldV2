@@ -126,7 +126,7 @@ class StockController extends Controller
         $listdept = array_map('intval', explode('~', Auth::user()->department_id));  
         $getstoreid = Store::whereIn('id', $listdept)->get();  
 
-         $list = Item::whereIn('store_id',$listdept)->get();
+         $list = Item::whereIn('store_id',$listdept)->where('status','Active')->get();
        
         return view('stock.Item',['list'=>$list,'listcat'=>$listcat,'listunit'=>$listunit,'getstoreid'=>$getstoreid]);
     }
@@ -545,39 +545,60 @@ class StockController extends Controller
                 return view('stock.IssueItem', ['listrequest'=>$listrequest ]);
     }
 
-    public function getBatchNumber(Request $request)
-{
-    $getID = $request->getID;
+   public function getBatchNumber(Request $request)
+    {
+        $getID = $request->getID;
 
-    $stock = DB::table('approve_stocks')
-        ->where('item_id', $getID)
-        ->where('qty', '>', 0)
-        ->where('status', 'approved')
+        // Get the item name first (works whether or not stock exists)
+        $item = DB::table('items')->where('id', $getID)->first();
 
-        // Skip expired items
-        ->whereDate('expiry_date', '>=', now())
+        if (!$item) {
+            return response()->json([
+                'batch_number' => null,
+                'message_error' => 'Item not found'
+            ]);
+        }
 
-        // Pick nearest expiry first (FEFO)
-        ->orderBy('expiry_date', 'ASC')
+        // Check if the item exists at all in approve_stocks
+        $itemExists = DB::table('approve_stocks')
+            ->where('item_id', $getID)
+            ->exists();
 
-        ->first();
+        if (!$itemExists) {
+            return response()->json([
+                'batch_number' => null,
+                'item_name'    => $item->name,
+                'message_error'      => 'No quantity for ' . $item->name
+            ]);
+        }
 
-    if ($stock) {
+        $stock = DB::table('approve_stocks')
+            ->where('item_id', $getID)
+            ->where('qty', '>', 0)
+            ->where('status', 'approved')
+            // Skip expired items
+            ->whereDate('expiry_date', '>=', now())
+            // Pick nearest expiry first (FEFO)
+            ->orderBy('expiry_date', 'ASC')
+            ->first();
+
+        if ($stock) {
+            return response()->json([
+                'batch_number' => $stock->batch_number,
+                'item_name'    => $item->name,
+                'store_id'     => $stock->store_id,
+                'stock_id'     => $stock->stock_id,
+                'qty'          => $stock->qty,
+                'expiry_date'  => $stock->expiry_date
+            ]);
+        }
 
         return response()->json([
-            'batch_number' => $stock->batch_number,
-            'store_id' => $stock->store_id,
-            'stock_id'     => $stock->stock_id,
-            'qty'          => $stock->qty,
-            'expiry_date'  => $stock->expiry_date
+            'batch_number' => null,
+            'item_name'    => $item->name,
+            'message'      => 'No valid non-expired stock available for ' . $item->name
         ]);
     }
-
-    return response()->json([
-        'batch_number' => null,
-        'message' => 'No valid non-expired stock available'
-    ]);
-}
 
     public function addItemIssue(Request $request)
 {
@@ -782,7 +803,7 @@ class StockController extends Controller
             ]);
         }
 
-        return redirect()->route('stock.print', $lastInvoice)
+        return redirect()->route('IssueApproval')
             ->with('message_success', 'Issues approved successfully');
     }
     

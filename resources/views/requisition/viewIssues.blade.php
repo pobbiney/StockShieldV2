@@ -68,7 +68,7 @@
                     <div class="row" style="margin-top:50px ">
                         <div class="col-md-12">
                             <div class="table-responsive">
-                                <form  id="approveForm" method="POST" action="{{ route('approveIssue-process') }}" target="_" >
+                                <form  id="approveForm" method="POST" action="{{ route('approveIssue-process') }}"  >
                             @csrf
                           <div class="table-responsive">
                             
