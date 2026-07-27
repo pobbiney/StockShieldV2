@@ -81,6 +81,7 @@
                                             <th>Item Code</th>
                                             <th >Item Name</th>
                                             <th>Batch Number</th>
+                                            <th>Current Stock Balance</th>
                                             <th>Qty Requested</th>
                                             <th>Qty</th>
                                             <th>Cost</th>
@@ -105,6 +106,7 @@
                                                 <td> {{ $lists->itemcode->item_code }}</td>
                                                 <td>{{ $lists->itemname->name}}</td>
                                                 <td>{{$lists->batch_number}}</td>
+                                                <td><b>{{ $itembalance[$lists->batch_number]->qty ?? 'N/A' }}</b></td>
                                                   <td>
                                                    @if($lists->qty_requested == NULL)
                                                    <b>{{ $lists->qty}}</b>

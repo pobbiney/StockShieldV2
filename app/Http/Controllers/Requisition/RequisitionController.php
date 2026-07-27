@@ -221,7 +221,7 @@ public function getApproveRequestView()
         $itemRequest->save();
     }
 
-    return redirect()->route('viewRequest')
+    return redirect()->route('ApproveRequest')
             ->with('message_success', 'Request approved successfully');
     }
 
@@ -405,8 +405,13 @@ public function getApproveRequestView()
         ->where('status','pending')
             ->orderBy('id', 'DESC')
             ->get();
-    
 
-        return view('requisition.viewIssues', ['listissues' => $listissues]);
+           $batchNumbers = $listissues->pluck('batch_number')->unique();
+
+    $itembalance = ApproveStock::whereIn('batch_number', $batchNumbers)
+        ->get()
+        ->keyBy('batch_number');
+
+        return view('requisition.viewIssues', ['listissues' => $listissues,'itembalance'=>$itembalance]);
     }
 }
