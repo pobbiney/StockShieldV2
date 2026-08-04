@@ -79,6 +79,15 @@
                         
                                  @error('item') <small style="color:red"> {{ $message}}</small> @enderror  
                             </div>
+                             <div class="col-md-1">
+                                <div class="form-group mb-3 position-relative check-valid">
+                                    <div class="form-floating">
+                                        <input type="text" name="uom" id="uom" class="form-control"  readonly
+                                        />
+                                         <label>UoM</label>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="col-md-4">
                                 <div class="form-group mb-3 position-relative check-valid">
                                     <div class="form-floating">
@@ -127,7 +136,7 @@
                                             <th>ID</th>
                                             <th>Item Code</th>
                                             <th >Item Name</th>
-                                            
+                                            <th>UoM</th>
                                             <th>Batch Number</th>
                                             
                                             <th>Qty</th>
@@ -147,10 +156,10 @@
                                                 <td>{{ $loop->iteration}}</td>
                                                 <td> {{ $lists->itemcode->item_code }}</td>
                                                 <td>{{ $lists->itemname->name}}</td>
-                                              
+                                                <td>{{$lists->itemname->unitname->name}}</td>
                                                 <td>{{$lists->batch_number}}</td>
                                                
-                                                <td>{{$lists->qty}}</td>
+                                                <td>{{$lists->qty_requested}}</td>
                                                 <td> {{$lists->amount}}</td>
                                                
                                                  
@@ -206,52 +215,46 @@
     }
 </script>
 
-<script>
-   $('#item_id').on('change', function () {
-
-    let itemId = $(this).val();
-
-    $.ajax({
-        url: "{{ route('get.batch.number') }}",
-        type: "POST",
-        data: {
-            getID: itemId,
-            _token: "{{ csrf_token() }}"
-        },
-
-        success: function (response) {
-
-            if (response.batch_number) {
-                $('#batch_number').val(response.batch_number);
-                $('#store_id').val(response.store_id);
-                $('#stock_id').val(response.stock_id);
-                $('#qty').text(response.qty);
-            } else {
-                $('#batch_number').val('');
-                $('#stock_id').val('');
-                $('#store_id').val('');
-
+ <script>
+    $('#item_id').on('change', function () {
+        let itemId = $(this).val();
+        $.ajax({
+            url: "{{ route('get.batch.number') }}",
+            type: "POST",
+            data: {
+                getID: itemId,
+                _token: "{{ csrf_token() }}"
+            },
+            success: function (response) {
+                if (response.batch_number) {
+                    $('#batch_number').val(response.batch_number);
+                    $('#store_id').val(response.store_id);
+                    $('#stock_id').val(response.stock_id);
+                    $('#qty').text(response.qty);
+                    $('#uom').val(response.uom_name); // now shows the actual UOM name
+                } else {
+                    $('#batch_number').val('');
+                    $('#stock_id').val('');
+                    $('#store_id').val('');
+                    $('#uom').val('');
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'No Stock Available',
+                        text: response.message || 'No stock available for this item',
+                        confirmButtonColor: '#d33'
+                    });
+                    $('#item_id').val('').trigger('change');
+                }
+            },
+            error: function () {
                 Swal.fire({
-                    icon: 'warning',
-                    title: 'No Stock Available',
-                    text: response.message || 'No stock available for this item',
-                    confirmButtonColor: '#d33'
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Something went wrong while checking stock.'
                 });
-
-                // Optional: reset the dropdown back to placeholder
-                $('#item_id').val('').trigger('change');
             }
-        },
-        error: function () {
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: 'Something went wrong while checking stock.'
-            });
-        }
+        });
     });
-
-});
 </script>
     
 @endsection

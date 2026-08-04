@@ -75,6 +75,7 @@ class IssueController extends Controller
                     'stock_id'       => $itemRequest->stock_id,
                     'item_id'        => $itemRequest->item_id,
                     'batch_number'   => $itemRequest->batch_number,
+                    'qty_requested'   => $itemRequest->qty_requested,
                     'qty'            => $issueQty,
                     'amount'         => $itemRequest->amount,
                     'requisition_no' => $itemRequest->requisition_no,

@@ -194,7 +194,7 @@
                            </div>
                     </div>
                 </div>
-                <div class="row">
+                <div class="row" style="margin-bottom: 15px;">
                     <div class="col-md-6">
                         <textarea class="form-control" name="comment" placeholder="Please Enter Comment if any" ></textarea>
                     </div>
@@ -203,6 +203,7 @@
                     <button type="submit" class="btn btn-success">Add New Stock </button>
                 </div>
             </div>
+            <input type="hidden" name="store_id" value="{{Auth::user()->department_id}}">
          </form>
          <hr/>
           @if($liststock->count() > 0)
@@ -319,6 +320,7 @@
             console.log('skamount element:', $('#skamount').length);
             console.log('skstore element:', $('#skstore').length);
             console.log('skbarcode element:', $('#skbarcode').length);
+            console.log('skcomment element:', $('#skcomment').length);
             
             
             // Set the values
@@ -335,6 +337,7 @@
             $('#skamount').val(data.amount);
             $('#skstore').val(data.store_id);
             $('#skbarcode').val(data.barcode);
+            $('#skcomment').val(data.comment);
              
             
             // Verify values were set
@@ -350,6 +353,7 @@
             console.log('Set skamount value:', $('#skamount').val());
             console.log('Set skstore value:', $('#skstore').val());
             console.log('Set skbarcode value:', $('#skbarcode').val());
+            console.log('Set skcomment value:', $('#skcomment').val());
             
             // Show the modal
             $('#xlmodal').modal('show');

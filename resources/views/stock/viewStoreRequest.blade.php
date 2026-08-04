@@ -78,8 +78,8 @@
                                             <th >Item Name</th>
                                             <th>UoM</th>
                                             <th>Batch Number</th>
-                                           
-                                            <th>Qty</th>
+                                            <th>Qty Requested</th>
+                                            <th>Qty Issued</th>
                                             <th>Unit Cost</th>
                                             <th>Requisition No</th>
                                             
@@ -104,8 +104,15 @@
                                                 <td>{{ $lists->itemname->name}}</td>
                                                 <td>{{$lists->itemname->unitname->name }}</td>
                                                 <td>{{$lists->batch_number}}</td>
+                                                <td>
+                                                   @if(!empty($lists->qty))
+                                                        <b>{{ $lists->qty }}</b>
+                                                    @else
+                                                        <b>{{ $lists->qty_requested}}</b>
+                                                    @endif
+                                                </td>
                                                
-                                                <td><input type="number" name="qty[{{ $lists->id }}]" class="form-control" value="{{$lists->qty}}"/></td>
+                                                <td><input type="number" name="qty[{{ $lists->id }}]" value="{{ old('qty.' . $lists->id) }}" class="form-control" /></td>
                                                 <td> {{$lists->amount}}</td>
                                                 <td> {{$lists->requisition_no}}</td>
                                                 <td> {{$lists->status}}</td>

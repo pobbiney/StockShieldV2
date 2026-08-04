@@ -68,11 +68,11 @@
                     <div class="row" style="margin-top:50px ">
                         <div class="col-md-12">
                             <div class="table-responsive">
-                                <form  id="approveForm" method="POST" action="{{ route('approveIssue-process') }}"  >
+                                <form  id="approveForm" method="POST" action="{{ route('approveIssue-process') }}"   >
                             @csrf
                           <div class="table-responsive">
                             
-                                <table  class="table table-bordered "  >
+                                <table  class="table table-bordered"  >
                                     <thead>
                                         <tr class="bg-l-gradient-light theme-green">
                                           
@@ -81,7 +81,8 @@
                                             <th>Item Code</th>
                                             <th >Item Name</th>
                                             <th>Batch Number</th>
-                                            
+                                            <th>Current Stock Balance</th>
+                                            <th>Qty Requested</th>
                                             <th>Qty</th>
                                             <th>Cost</th>
                                             <th>Requisition No  </th>
@@ -105,7 +106,14 @@
                                                 <td> {{ $lists->itemcode->item_code }}</td>
                                                 <td>{{ $lists->itemname->name}}</td>
                                                 <td>{{$lists->batch_number}}</td>
-                                               
+                                                <td><b>{{ $itembalance[$lists->batch_number]->qty ?? 'N/A' }}</b></td>
+                                                  <td>
+                                                   @if($lists->qty_requested == NULL)
+                                                   <b>{{ $lists->qty}}</b>
+                                                   @else
+                                                   <b>$lists->qty_requested</b>
+                                                   @endif
+                                                </td>
                                                 <td style="width: 120px"><input type="number" name="qty[{{ $lists->id }}]" class="form-control" value="{{$lists->qty}}"/></td>
                                                 <td> {{ number_format($lists->amount,2)}}</td>
                                                 <td> {{$lists->requisition_no}}</td>

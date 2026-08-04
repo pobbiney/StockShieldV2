@@ -47,10 +47,16 @@ class RequisitionController extends Controller
                         ->where('stock_id', $request->stock_id)
                         ->first();
 
-            
-
             if (!$stock) {
                 return back()->with('message_error', 'Selected item has no Quantity.');
+            }
+
+            // New check: requested quantity vs available stock
+            if ($request->quantity > $stock->qty) {
+                return back()->with(
+                    'message_error',
+                    'Requested quantity (' . $request->quantity . ') exceeds available stock (' . $stock->qty . ').'
+                );
             }
 
             try {
@@ -58,17 +64,15 @@ class RequisitionController extends Controller
                     'stock_id'      => $stock->stock_id,
                     'item_id'       => $stock->item_id,
                     'batch_number'  => $request->batch_number,
-                    'qty'           => $request->quantity,
+                    'qty_requested' => $request->quantity,
                     'amount'        => $stock->amount,
                     'item_store_id' => $stock->store_id,
                     'store_id'      => Auth::user()->department_id,
                     'created_by'    => Auth::user()->id,
                 ]);
 
-             
-
             } catch (\Exception $e) {
-                dd($e->getMessage());
+                return back()->with('message_error', 'Something went wrong: ' . $e->getMessage());
             }
 
             return back()->with('message_success', 'Item successfully added');
@@ -221,7 +225,8 @@ public function getApproveRequestView()
         $itemRequest->save();
     }
 
-    return back()->with('message_success', 'Requisition approved successfully');
+    return redirect()->route('ApproveRequest')
+            ->with('message_success', 'Request approved successfully');
     }
 
 
@@ -404,8 +409,13 @@ public function getApproveRequestView()
         ->where('status','pending')
             ->orderBy('id', 'DESC')
             ->get();
-    
 
-        return view('requisition.viewIssues', ['listissues' => $listissues]);
+           $batchNumbers = $listissues->pluck('batch_number')->unique();
+
+    $itembalance = ApproveStock::whereIn('batch_number', $batchNumbers)
+        ->get()
+        ->keyBy('batch_number');
+
+        return view('requisition.viewIssues', ['listissues' => $listissues,'itembalance'=>$itembalance]);
     }
 }

@@ -127,7 +127,9 @@ Route::get('stockEntry/{id}/delete', [StockController::class, 'deleteStockItem']
 Route::post('edit-stock-process',[StockController::class,'updateStock'])->name('edit-stock-process');
 Route::get('stockApproval',[StockController::class,'getstockApprovalView'])->name('stockApproval');
 Route::get('/stockApproval/{id}', [StockController::class, 'ApproveStock'])->name('stock.stockApproval');
-Route::get('/approve-all-stock', [StockController::class, 'approveAll'])
+ 
+
+    Route::get('/approve-all-stock/{store_id}', [StockController::class,'approveAll'])
     ->name('stock.approveAll');
 Route::get('pendingStock',[StockController::class,'getpendingStockView'])->name('pendingStock');
 Route::get('approvedStock',[StockController::class,'getapprovedStockView'])->name('approvedStock');
@@ -153,6 +155,7 @@ Route::post('add-bulkupload-process', [StockController::class, 'addBulkupload'])
 Route::get('issue-item-id/{id}',[StockController::class,'getIssueItemID'])->name('issue-item-id');
 Route::post('add-rejection-process', [StockController::class, 'addItemRejection'])->name('add-rejection-process');
 Route::get('MyRequest',[StockController::class,'getMyRequestView'])->name('MyRequest');
+Route::get('viewStockEntry/{store_id}',[StockController::class,'getviewStockEntry'])->name('viewStockEntry');
  
 /* End of Stock Management */
 
@@ -211,6 +214,26 @@ Route::post('DetailedCommodityReport',[ReportDetailsController::class,'searchCom
 Route::get('/commoditydetailedreport-print',[ReportDetailsController::class, 'printCommodityDetailReport'])->middleware('auth')  ->name('report.commoditydetailedreport-print');
 Route::get('/summary-report-print',[ReportDetailsController::class, 'printSummaryReport'])->middleware('auth')  ->name('report.summary-report-print');
 
+Route::get('searchIssuedItemByDepartment',[ReportController::class,'searchIssueItemByDepartmentView'])->name('searchIssuedItemByDepartment');
+Route::post('searchIssuedItemByDepartment',[ReportController::class,'searchIssuedItemByDeprtReport'])->name('report.issueddepartitem-report');
+Route::get('/issueditem-by-department-stock-report/{department}', [ReportController::class, 'printIssuedItemByDepartReport']) ->middleware('auth')->name('report.issueditem-by-department-stock-print');
+
+
+Route::get('searchByIssueItemDepartment',[ReportController::class,'getsearchByIssueItemDepartmentView'])->name('searchByIssueItemDepartment');
+Route::post('searchByIssueItemDepartment',[ReportController::class,'searchIssuedItemDepartReport'])->name('report.searchbyIssueItemDepartment-report');
+Route::get('/issueditem-department-print/{department}', [ReportController::class, 'printIssuedByItemDepartReport']) ->middleware('auth')->name('report.issueditem-department-print');
+
+Route::get('searchByIssuedDepartmentDate',[ReportController::class,'getsearchByIssuedDateDepartView'])->name('searchByIssuedDepartmentDate');
+Route::post('searchByIssuedDepartmentDate',[ReportController::class,'searchByIssuedDepartDate'])->name('report.searchByIssuedDepartmentDate-report');
+Route::get('/issued-item-date-department-print',
+    [ReportController::class, 'printIssuedItemDateDepartReport'])
+    ->middleware('auth')  ->name('report.issued-item-date-department-print');
+
+Route::get('searchIssuedItemByDepartmentDateIntev',[ReportController::class,'getsearchIssuedItemByDepartDateIntevView'])->name('searchIssuedItemByDepartmentDateIntev');
+Route::post('searchIssuedItemByDepartmentDateIntev',[ReportController::class,'searchIssuedItemByDepartDateIntev'])->name('report.searchIssuedItemBydepartmentDateIntev-report');
+Route::get('/issued-item-byitemDepartDate-print',[ReportController::class, 'printIssuedItemDateIntervalDepartReport'])->middleware('auth')  ->name('report.issued-item-byitemDepartDate-print');
+
+
 
 /* End of Report */
 
@@ -253,5 +276,6 @@ Route::get('return-item-approval-id/{id}',[RequisitionController::class,'getretu
 
 // routes/web.php
 Route::get('check-notifications', [NotificationController::class, 'checkNew'])->name('check-notifications');
+
 
 /* End of Issues*/
