@@ -62,32 +62,56 @@
 
                           <div class="table-responsive" style="margin-top: 50px">
                             <h4>List of All Pending Stocks </h4>
-                               <table  class="display" id="myTable">
-                                <thead>
+                               
+                                <table  class="display" id="myTable">
+                                    <thead>
                                         <tr>
                                             <th>ID</th>
-                                            <th>Description</th>
-                                            <th>Status</th>
+                                            <th>Item Code</th>
+                                            <th >Item Name</th>
+                                            <th>Batch Number</th>
+                                            <th>Expiry Date</th>
+                                            <th>Received Date</th>
+
+                                            <th>Qty</th>
+                                            <th>Cost</th>
+                                            <th>Purchase Order</th>
+                                            <th>Vendor</th>
+                                            <th>Store</th>
+                                            <th>Action</th>
+                                                
                                         </tr>
                                     </thead>
                                     <tbody>
                                             
-                                         
+                                            
                                             @foreach($liststock as $lists)
                                             <tr>
                                                 <td>{{ $loop->iteration}}</td>
-                                                <td> There is a pending stock awaiting approval  from <b>{{ $lists->storename->name}}  </b></td>
-                                                <td><a href="{{ route('viewStockEntry', Crypt::encrypt($lists->store_id)) }}" class="btn btn-success"><i class="fa fa-eye"></i> Open Request </a></td>
-                                               
-                                                     
-                                            </tr> 
+                                                <td> {{ $lists->itemcode->item_code }}</td>
+                                                <td>{{ $lists->itemname->name}}</td>
+                                                <td>{{$lists->batch_number}}</td>
+                                                <td>{{$lists->expiry_date}}</td>
+                                                <td>{{$lists->created_at}}</td>
+                                                <td>{{$lists->qty}}</td>
+                                                <td> {{ number_format($lists->amount, 2) }}</td>
+                                                <td> {{$lists->purchase_order}}</td>
+                                                <td> {{$lists->supname->company}}</td>
+                                                <td> {{$lists->storename->name}}</td>
+                                                    <td><a class="btn btn-sm btn-success delete-btn"  onclick="return confirm('Are you sure you want to Approve this ?')"
+                                                    href="{{ route('stock.stockApproval', $lists->id) }}"  ><i class="fa fa-check-circle"></i> Approve</a>
+
+                                              
+                                                      
+                                            </tr>
                                                 
                                             
-                                            @endforeach 
+                                            @endforeach
                                             
                                     </tbody>
                                 </table>
-                                
+                                <a href="{{ route('stock.approveAll',$lists->store_id) }}" class="btn btn-info" onclick="return confirm('Approve all pending stock ?')"> Approve All</a>
+                               
                                 
                             </div>
                    </div>

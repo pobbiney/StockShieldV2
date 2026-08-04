@@ -47,10 +47,16 @@ class RequisitionController extends Controller
                         ->where('stock_id', $request->stock_id)
                         ->first();
 
-            
-
             if (!$stock) {
                 return back()->with('message_error', 'Selected item has no Quantity.');
+            }
+
+            // New check: requested quantity vs available stock
+            if ($request->quantity > $stock->qty) {
+                return back()->with(
+                    'message_error',
+                    'Requested quantity (' . $request->quantity . ') exceeds available stock (' . $stock->qty . ').'
+                );
             }
 
             try {
@@ -58,17 +64,15 @@ class RequisitionController extends Controller
                     'stock_id'      => $stock->stock_id,
                     'item_id'       => $stock->item_id,
                     'batch_number'  => $request->batch_number,
-                    'qty_requested'           => $request->quantity,
+                    'qty_requested' => $request->quantity,
                     'amount'        => $stock->amount,
                     'item_store_id' => $stock->store_id,
                     'store_id'      => Auth::user()->department_id,
                     'created_by'    => Auth::user()->id,
                 ]);
 
-             
-
             } catch (\Exception $e) {
-                dd($e->getMessage());
+                return back()->with('message_error', 'Something went wrong: ' . $e->getMessage());
             }
 
             return back()->with('message_success', 'Item successfully added');

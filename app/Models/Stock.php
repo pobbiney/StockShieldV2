@@ -32,8 +32,9 @@ class Stock extends Model
 
 	 public function staffname()
 	{
-		return $this->belongsTo(User::class, 'created_by' ,'id'); // 'itemID' is the foreign key
+		return $this->belongsTo(User::class, 'created_by' ,'id'); //  
 	}
+    
 
-	 
+
 }

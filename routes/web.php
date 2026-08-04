@@ -127,7 +127,9 @@ Route::get('stockEntry/{id}/delete', [StockController::class, 'deleteStockItem']
 Route::post('edit-stock-process',[StockController::class,'updateStock'])->name('edit-stock-process');
 Route::get('stockApproval',[StockController::class,'getstockApprovalView'])->name('stockApproval');
 Route::get('/stockApproval/{id}', [StockController::class, 'ApproveStock'])->name('stock.stockApproval');
-Route::get('/approve-all-stock', [StockController::class, 'approveAll'])
+ 
+
+    Route::get('/approve-all-stock/{store_id}', [StockController::class,'approveAll'])
     ->name('stock.approveAll');
 Route::get('pendingStock',[StockController::class,'getpendingStockView'])->name('pendingStock');
 Route::get('approvedStock',[StockController::class,'getapprovedStockView'])->name('approvedStock');
@@ -153,6 +155,7 @@ Route::post('add-bulkupload-process', [StockController::class, 'addBulkupload'])
 Route::get('issue-item-id/{id}',[StockController::class,'getIssueItemID'])->name('issue-item-id');
 Route::post('add-rejection-process', [StockController::class, 'addItemRejection'])->name('add-rejection-process');
 Route::get('MyRequest',[StockController::class,'getMyRequestView'])->name('MyRequest');
+Route::get('viewStockEntry/{store_id}',[StockController::class,'getviewStockEntry'])->name('viewStockEntry');
  
 /* End of Stock Management */
 

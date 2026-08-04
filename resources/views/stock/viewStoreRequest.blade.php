@@ -112,7 +112,7 @@
                                                     @endif
                                                 </td>
                                                
-                                                <td><input type="number" name="qty[{{ $lists->id }}]" class="form-control" /></td>
+                                                <td><input type="number" name="qty[{{ $lists->id }}]" value="{{ old('qty.' . $lists->id) }}" class="form-control" /></td>
                                                 <td> {{$lists->amount}}</td>
                                                 <td> {{$lists->requisition_no}}</td>
                                                 <td> {{$lists->status}}</td>

@@ -415,14 +415,14 @@ class StockController extends Controller
 
    public function getstockApprovalView()
    {
-
     
-         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
-       
-         
-        $liststock = Stock::whereIn('store_id',$listdept)
-        ->where('status','pending')->get();
-    return view('stock.stockApproval',['liststock'=>$liststock]);
+     $liststock = Stock::select('store_id')
+        ->where('status', 'pending')
+        ->groupBy('store_id')
+        ->orderBy('store_id')
+        ->get();
+
+    return view('stock.stockApproval', compact('liststock'));
    }
 
     public function ApproveStock($id)
@@ -430,12 +430,12 @@ class StockController extends Controller
         
 
       // Logged in user's store
-    $storeId = Auth::user()->department_id;
+    
 
     // Get selected pending stock
     $stocks = Stock::where('id', $id)
                     ->where('status', 'pending')
-                    ->where('store_id', $storeId)
+                    
                     ->get();
     foreach ($stocks as $stock) {
 
@@ -466,14 +466,12 @@ class StockController extends Controller
         return back()->with('message_success', 'Stock Approved Successfully');
     }
 
-      public function approveAll()
+      public function approveAll($store_id)
     {
-    // Get logged in user's store
-    $storeId = Auth::user()->department_id;
-
+    
     // Get only pending stock for that store
     $stocks = Stock::where('status', 'pending')
-                    ->where('store_id', $storeId)
+                    ->where('store_id', $store_id)
                     ->get();
 
     foreach ($stocks as $stock) {
@@ -499,7 +497,7 @@ class StockController extends Controller
             ]);
     }
 
-    return back()->with('message_success', 'All pending stock approved successfully');
+    return  redirect()->route('stockApproval')->with('message_success', 'All pending stock approved successfully');
    }
 
    public function getpendingStockView()
@@ -548,11 +546,11 @@ class StockController extends Controller
                 return view('stock.IssueItem', ['listrequest'=>$listrequest ]);
     }
 
-   public function getBatchNumber(Request $request)
+    
+    public function getBatchNumber(Request $request)
     {
         $getID = $request->getID;
 
-        // Get the item name first (works whether or not stock exists)
         $item = DB::table('items')->where('id', $getID)->first();
 
         if (!$item) {
@@ -562,7 +560,6 @@ class StockController extends Controller
             ]);
         }
 
-        // Check if the item exists at all in approve_stocks
         $itemExists = DB::table('approve_stocks')
             ->where('item_id', $getID)
             ->exists();
@@ -571,19 +568,20 @@ class StockController extends Controller
             return response()->json([
                 'batch_number' => null,
                 'item_name'    => $item->name,
-                'message_error'      => 'No quantity for ' . $item->name
+                'message_error' => 'No quantity for ' . $item->name
             ]);
         }
 
-        $stock = DB::table('approve_stocks')
-            ->where('item_id', $getID)
-            ->where('qty', '>', 0)
-            ->where('status', 'approved')
-            // Skip expired items
-            ->whereDate('expiry_date', '>=', now())
-            // Pick nearest expiry first (FEFO)
-            ->orderBy('expiry_date', 'ASC')
-            ->first();
+       $stock = DB::table('approve_stocks')
+        ->join('items', 'approve_stocks.item_id', '=', 'items.id')
+        ->join('unit_of_measures', 'items.unit_id', '=', 'unit_of_measures.id')
+        ->where('approve_stocks.item_id', $getID)
+        ->where('approve_stocks.qty', '>', 0)
+        ->where('approve_stocks.status', 'approved')
+        ->whereDate('approve_stocks.expiry_date', '>=', now())
+        ->orderBy('approve_stocks.expiry_date', 'ASC')
+        ->select('approve_stocks.*', 'unit_of_measures.name as uom_name', 'items.unit_id')
+        ->first();
 
         if ($stock) {
             return response()->json([
@@ -592,14 +590,16 @@ class StockController extends Controller
                 'store_id'     => $stock->store_id,
                 'stock_id'     => $stock->stock_id,
                 'qty'          => $stock->qty,
-                'expiry_date'  => $stock->expiry_date
+                'expiry_date'  => $stock->expiry_date,
+                'unit_id'      => $stock->unit_id,
+                'uom_name'     => $stock->uom_name
             ]);
         }
 
         return response()->json([
             'batch_number' => null,
             'item_name'    => $item->name,
-            'message'      => 'No valid non-expired stock available for ' . $item->name
+            'message'      => 'No stock available for ' . $item->name
         ]);
     }
 
@@ -864,5 +864,43 @@ class StockController extends Controller
 
             return $status ? back()->with('message_success','Item has been rejected successfully') : back()->with('message_error','Something went wrong, please try again.');
     }
+
+     public function getviewStockEntry()
+   {
+     // Get department IDs from user
+    $departmentIds = Auth::user()->department_id;
+    
+    // Convert to array if it's a string with ~ separator
+    if (is_string($departmentIds) && strpos($departmentIds, '~') !== false) {
+        $listdept = array_map('intval', explode('~', $departmentIds));
+    } else {
+        // If it's already an array or single value
+        $listdept = is_array($departmentIds) ? $departmentIds : [$departmentIds];
+    }
+    
+    // Filter out empty or invalid values
+    $listdept = array_filter($listdept);
+    
+    // If no departments, return empty view
+    if (empty($listdept)) {
+        return view('stock.viewStockEntry', ['liststock' => collect()]);
+    }
+    
+    // Get pending stocks for the departments
+    $liststock = Stock::whereIn('store_id', $listdept)
+        ->where('status', 'pending')
+        
+        ->orderBy('created_at', 'DESC')
+        ->get();
+    
+    // If you need to group by store_id, do it in the view or use a collection
+    // Option 1: Group in the view (recommended)
+    // $groupedStock = $liststock->groupBy('store_id');
+    
+    return view('stock.viewStockEntry', [
+        'liststock' => $liststock,
+        // 'groupedStock' => $groupedStock // If you want grouped data
+    ]);
+   }
     
 }
