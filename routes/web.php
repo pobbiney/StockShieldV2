@@ -144,6 +144,7 @@ Route::get('/approve-all-issues', [StockController::class, 'approveAllIssues'])
 
 Route::get('IssueApproval',[StockController::class,'getIssueApproval'])->name('IssueApproval');
 Route::post('IssueApproval',[StockController::class,'searchIssues'])->name('stock.search-issues');
+Route::post('/get-item-uom', [StockController::class, 'getItemUom'])->name('get.item.uom');
 
 
 

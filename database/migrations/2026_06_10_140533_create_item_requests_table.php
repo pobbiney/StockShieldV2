@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::create('item_requests', function (Blueprint $table) {
             $table->id();
              $table->integer('item_id');
-            $table->string('batch_number');
+            $table->string('batch_number')->nullable();
             $table->integer('item_store_id');
-            $table->integer('qty');
+            $table->integer('qty')->nullable();
             $table->string('requisition_no')->nullable();
      
             $table->integer('stock_id');

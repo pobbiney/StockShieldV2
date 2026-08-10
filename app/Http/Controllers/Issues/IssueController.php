@@ -37,74 +37,93 @@ class IssueController extends Controller
     
    
 
+ 
+
     public function addIssueRequest(Request $request)
     {
-        // VALIDATION PHASE (unchanged)
-        foreach ($request->qty as $requestId => $issueQty) {
-            $itemRequest = ItemRequest::find($requestId);
-            $stock = ApproveStock::where('item_id', $itemRequest->item_id)
-                        ->where('batch_number', $itemRequest->batch_number)
-                        ->first();
+        $requestIds = $request->input('request_id', []);
+        $qtyInputs  = $request->input('qty', []);
 
-            if (!$stock) {
-                return redirect()->back()->withInput()
-                    ->with('message_error', "No stock found for {$itemRequest->itemname->name}");
-            }
-
-            if ($stock->expiry_date && Carbon::parse($stock->expiry_date)->lte(Carbon::today())) {
-                return redirect()->back()->withInput()
-                    ->with('message_error', "{$itemRequest->itemname->name} has expired.");
-            }
-
-            if ($issueQty > $stock->qty) {
-                return redirect()->back()->withInput()
-                    ->with('message_error', "{$itemRequest->itemname->name}: Requested {$issueQty} but only {$stock->qty} available.");
-            }
+        if (empty($requestIds)) {
+            return back()->with('message_error', 'No items selected to issue.');
         }
 
-        // SAVE PHASE
-        DB::beginTransaction();
-        try {
-            foreach ($request->qty as $requestId => $issueQty) {
-                $itemRequest = ItemRequest::find($requestId);
-                $stock = ApproveStock::where('item_id', $itemRequest->item_id)
-                            ->where('batch_number', $itemRequest->batch_number)
-                            ->first();
+        $allWarnings   = [];
+        $hasHardFailure = false;
+
+        foreach ($requestIds as $itemRequestId) {
+            $itemRequest = ItemRequest::find($itemRequestId);
+
+            if (!$itemRequest) {
+                continue;
+            }
+
+            $qtyToIssue = $qtyInputs[$itemRequestId] ?? null;
+
+            if (!$qtyToIssue || $qtyToIssue <= 0) {
+                continue;
+            }
+
+            $remainingQty = $qtyToIssue;
+
+            $batches = ApproveStock::where('item_id', $itemRequest->item_id)
+                ->where('status', 'approved')
+                ->where('qty', '>', 0)
+                ->whereDate('expiry_date', '>=', now())
+                ->orderBy('expiry_date', 'ASC')
+                ->get();
+
+            if ($batches->isEmpty()) {
+                $allWarnings[] = "{$itemRequest->itemname->name}: no stock available.";
+                $hasHardFailure = true;
+                continue;
+            }
+
+            foreach ($batches as $stock) {
+                if ($remainingQty <= 0) break;
+
+                $qtyToTake = min($remainingQty, $stock->qty);
 
                 ItemIssue::create([
-                    'stock_id'       => $itemRequest->stock_id,
-                    'item_id'        => $itemRequest->item_id,
-                    'batch_number'   => $itemRequest->batch_number,
-                    'qty_requested'   => $itemRequest->qty_requested,
-                    'qty'            => $issueQty,
-                    'amount'         => $itemRequest->amount,
+                'stock_id'         => $stock->stock_id,
+                    'item_id'          => $stock->item_id,
+                    'batch_number'     => $stock->batch_number,
+                    'qty_requested'     => $itemRequest->qty_requested,
+                    'qty'       => $qtyToTake,
+                    'amount'       => $stock->amount,
+                    
                     'requisition_no' => $itemRequest->requisition_no,
                     'issue_to'       => $itemRequest->store_id,
                     'store_id'       => $itemRequest->item_store_id,
-                    'created_by'     => Auth::id(),
+                    'created_by'       => Auth::id(),
                 ]);
 
-                $itemRequest->update(['status' => 'pending issues']);
+                $daysToExpiry = now()->diffInDays($stock->expiry_date, false);
+                if ($daysToExpiry <= 30) {
+                    $allWarnings[] = "Batch {$stock->batch_number} for {$itemRequest->itemname->name} expires in {$daysToExpiry} day(s).";
+                }
 
-                 // ONE notification for the whole requisition, not per item
-                $itemCount = $itemRequest->count();
-
-                SystemNotifications::create([
-                    'title'        => 'Item Issued — Pending Dispatch',
-                    'message'      => "Requisition {$itemRequest->requisition_no} submitted with {$itemCount} item(s), needs approval.",
-                    //'link'         => route('pending-requests', ['requisition_no' => $itemRequest->requisition_no]),
-                    'type'         => 'new_request',
-                    'reference_id' => $itemRequest->requisition_no,
-                ]);
-
+                $remainingQty -= $qtyToTake;
             }
 
-            DB::commit();
-            return redirect()->back()->with('message_success', 'Items issued successfully.');
+            if ($remainingQty > 0) {
+                $fulfilled = $qtyToIssue - $remainingQty;
+                $allWarnings[] = "{$itemRequest->itemname->name}: only {$fulfilled} of {$qtyToIssue} could be issued.";
+            }
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return redirect()->back()->with('message_error', $e->getMessage());
+            $itemRequest->update(['status' => 'issued']);
         }
+
+        $message = 'Item(s) issued and sent for HOD approval.';
+
+        if (!empty($allWarnings)) {
+            $message .= ' ' . implode(' ', $allWarnings);
+        }
+
+        if ($hasHardFailure) {
+            return back()->with('message_error', $message);
+        }
+
+        return back()->with('message_success', $message);
     }
 }

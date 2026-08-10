@@ -70,61 +70,45 @@
                             <div class="table-responsive">
                                <form enctype="multipart/form-data" method="POST" action="{{ route('issue-request-process') }}" >
                                 @csrf
-                                <table  class="table table-bordered"  >
+                                <table class="table table-bordered">
                                     <thead>
                                         <tr>
                                             <th>ID</th>
                                             <th>Item Code</th>
-                                            <th >Item Name</th>
+                                            <th>Item Name</th>
                                             <th>UoM</th>
-                                            <th>Batch Number</th>
                                             <th>Qty Requested</th>
-                                            <th>Qty Issued</th>
-                                            <th>Unit Cost</th>
+                                            <th>Qty to Issue</th>
                                             <th>Requisition No</th>
-                                            
                                             <th>Status</th>
-                                            <th>Created By </th>
+                                            <th>Created By</th>
                                             <th>Action</th>
-                                           
-                                                
                                         </tr>
                                     </thead>
                                     <tbody>
-                                            
-                                         
-                                            @foreach($listrequest as $lists)
-                                            <tr>
-                                                <td>{{ $loop->iteration}} <input type="hidden"
-                                                    name="request_id[]"
-                                                    value="{{ $lists->id }}"> <input type="hidden"
-                                                    name="stock_id[]"
-                                                    value="{{ $lists->stock_id }}"></td>
-                                                <td> {{ $lists->itemcode->item_code }}</td>
-                                                <td>{{ $lists->itemname->name}}</td>
-                                                <td>{{$lists->itemname->unitname->name }}</td>
-                                                <td>{{$lists->batch_number}}</td>
-                                                <td>
-                                                   @if(!empty($lists->qty))
-                                                        <b>{{ $lists->qty }}</b>
-                                                    @else
-                                                        <b>{{ $lists->qty_requested}}</b>
-                                                    @endif
-                                                </td>
-                                               
-                                                <td><input type="number" name="qty[{{ $lists->id }}]" value="{{ old('qty.' . $lists->id) }}" class="form-control" /></td>
-                                                <td> {{$lists->amount}}</td>
-                                                <td> {{$lists->requisition_no}}</td>
-                                                <td> {{$lists->status}}</td>
-                                                <td>{{ $lists->staffname->name}}</td>
-                                                 <td><a href="" class="btn btn-sm btn-danger showmodal"  data-url="{{ route('request-item-id',$lists->id)  }}" data-bs-toggle="modal" data-bs-target="#standardmodal" ><i class="fa fa-times"></i> Reject</a></td>
-                                                
-                                                     
-                                            </tr> 
-                                                
-                                            
-                                            @endforeach 
-                                            
+                                        @foreach($listrequest as $lists)
+                                        <tr>
+                                            <td>
+                                                {{ $loop->iteration }}
+                                                <input type="hidden" name="request_id[]" value="{{ $lists->id }}">
+                                            </td>
+                                            <td>{{ $lists->itemcode->item_code }}</td>
+                                            <td>{{ $lists->itemname->name }}</td>
+                                            <td>{{ $lists->itemname->unitname->name }}</td>
+                                            <td><b>{{ $lists->qty_requested }}</b></td>
+                                            <td>
+                                                <input type="number" name="qty[{{ $lists->id }}]" value="{{ old('qty.' . $lists->id, $lists->qty_requested) }}" class="form-control" min="1">
+                                            </td>
+                                            <td>{{ $lists->requisition_no }}</td>
+                                            <td>{{ $lists->status }}</td>
+                                            <td>{{ $lists->staffname->name }}</td>
+                                            <td>
+                                                <a href="" class="btn btn-sm btn-danger showmodal" data-url="{{ route('request-item-id', $lists->id) }}" data-bs-toggle="modal" data-bs-target="#standardmodal">
+                                                    <i class="fa fa-times"></i> Reject
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        @endforeach
                                     </tbody>
                                 </table>
                               @if($listrequest->isNotEmpty())

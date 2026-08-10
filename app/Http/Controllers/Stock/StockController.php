@@ -902,5 +902,22 @@ class StockController extends Controller
         // 'groupedStock' => $groupedStock // If you want grouped data
     ]);
    }
+
+   public function getItemUom(Request $request)
+{
+    $item = DB::table('items')
+        ->join('unit_of_measures', 'items.unit_id', '=', 'unit_of_measures.id')
+        ->where('items.id', $request->item_id)
+        ->select('items.name as item_name', 'unit_of_measures.name as uom_name')
+        ->first();
+
+    if (!$item) {
+        return response()->json(['uom_name' => null]);
+    }
+
+    return response()->json([
+        'uom_name' => $item->uom_name
+    ]);
+}
     
 }

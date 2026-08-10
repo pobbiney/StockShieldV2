@@ -35,49 +35,35 @@ class RequisitionController extends Controller
         return view('requisition.Requisition', ['getItemid'=>$getItemid,'liststore'=>$liststore,'listitemissue'=>$listitemissue]);
     }
 
-         public function addRequest(Request $request)
+        
+        public function addRequest(Request $request)
         {
             $request->validate([
                 'item'     => 'required',
                 'quantity' => 'required|numeric|min:1',
-                'stock_id' => 'required',
             ]);
 
-            $stock = ApproveStock::where('status', 'approved')
-                        ->where('stock_id', $request->stock_id)
-                        ->first();
+            $item = DB::table('items')->where('id', $request->item)->first();
 
-            if (!$stock) {
-                return back()->with('message_error', 'Selected item has no Quantity.');
-            }
-
-            // New check: requested quantity vs available stock
-            if ($request->quantity > $stock->qty) {
-                return back()->with(
-                    'message_error',
-                    'Requested quantity (' . $request->quantity . ') exceeds available stock (' . $stock->qty . ').'
-                );
+            if (!$item) {
+                return back()->with('message_error', 'Selected item not found.');
             }
 
             try {
                 ItemRequest::create([
-                    'stock_id'      => $stock->stock_id,
-                    'item_id'       => $stock->item_id,
-                    'batch_number'  => $request->batch_number,
+                    'item_id'       => $request->item,
                     'qty_requested' => $request->quantity,
-                    'amount'        => $stock->amount,
-                    'item_store_id' => $stock->store_id,
-                    'store_id'      => Auth::user()->department_id,
+                    'store_id'      => Auth::user()->department_id, // requesting department
+                    'item_store_id' => $item->store_id,               // the item's home/holding store
                     'created_by'    => Auth::user()->id,
+                    
                 ]);
-
             } catch (\Exception $e) {
                 return back()->with('message_error', 'Something went wrong: ' . $e->getMessage());
             }
 
             return back()->with('message_success', 'Item successfully added');
         }
-
 
        public function deleteitemRequest(string $id)
     {
