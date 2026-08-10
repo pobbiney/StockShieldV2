@@ -86,6 +86,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
+<<<<<<< HEAD
                                         @foreach($listrequest as $lists)
                                         <tr>
                                             <td>
@@ -109,6 +110,42 @@
                                             </td>
                                         </tr>
                                         @endforeach
+=======
+                                            
+                                         
+                                            @foreach($listrequest as $lists)
+                                            <tr>
+                                                <td>{{ $loop->iteration}} <input type="hidden"
+                                                    name="request_id[]"
+                                                    value="{{ $lists->id }}"> <input type="hidden"
+                                                    name="stock_id[]"
+                                                    value="{{ $lists->stock_id }}"></td>
+                                                <td> {{ $lists->itemcode->item_code }}</td>
+                                                <td>{{ $lists->itemname->name}}</td>
+                                                <td>{{$lists->itemname->unitname->name }}</td>
+                                                <td>{{$lists->batch_number}}</td>
+                                                <td>
+                                                   @if(!empty($lists->qty))
+                                                        <b>{{ $lists->qty }}</b>
+                                                    @else
+                                                        <b>{{ $lists->qty_requested}}</b>
+                                                    @endif
+                                                </td>
+                                               
+                                                <td><input type="number" name="qty[{{ $lists->id }}]" value="{{ old('qty.' . $lists->id) }}" class="form-control" /></td>
+                                                <td> {{$lists->amount}}</td>
+                                                <td> {{$lists->requisition_no}}</td>
+                                                <td> {{$lists->status}}</td>
+                                                <td>{{ $lists->staffname->name}}</td>
+                                                 <td><a href="" class="btn btn-sm btn-danger showmodal"  data-url="{{ route('request-item-id',$lists->id)  }}" data-bs-toggle="modal" data-bs-target="#standardmodal" ><i class="fa fa-times"></i> Reject</a></td>
+                                                
+                                                     
+                                            </tr> 
+                                                
+                                            
+                                            @endforeach 
+                                            
+>>>>>>> 3b001aeea4c5ceae9e7bb892e0440c524eabe236
                                     </tbody>
                                 </table>
                               @if($listrequest->isNotEmpty())

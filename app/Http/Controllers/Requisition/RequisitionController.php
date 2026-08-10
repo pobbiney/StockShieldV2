@@ -45,19 +45,46 @@ class RequisitionController extends Controller
 
             $item = DB::table('items')->where('id', $request->item)->first();
 
+<<<<<<< HEAD
             if (!$item) {
                 return back()->with('message_error', 'Selected item not found.');
+=======
+            if (!$stock) {
+                return back()->with('message_error', 'Selected item has no Quantity.');
+>>>>>>> 3b001aeea4c5ceae9e7bb892e0440c524eabe236
+            }
+
+            // New check: requested quantity vs available stock
+            if ($request->quantity > $stock->qty) {
+                return back()->with(
+                    'message_error',
+                    'Requested quantity (' . $request->quantity . ') exceeds available stock (' . $stock->qty . ').'
+                );
             }
 
             try {
                 ItemRequest::create([
+<<<<<<< HEAD
                     'item_id'       => $request->item,
                     'qty_requested' => $request->quantity,
                     'store_id'      => Auth::user()->department_id, // requesting department
                     'item_store_id' => $item->store_id,               // the item's home/holding store
+=======
+                    'stock_id'      => $stock->stock_id,
+                    'item_id'       => $stock->item_id,
+                    'batch_number'  => $request->batch_number,
+                    'qty_requested' => $request->quantity,
+                    'amount'        => $stock->amount,
+                    'item_store_id' => $stock->store_id,
+                    'store_id'      => Auth::user()->department_id,
+>>>>>>> 3b001aeea4c5ceae9e7bb892e0440c524eabe236
                     'created_by'    => Auth::user()->id,
                     
                 ]);
+<<<<<<< HEAD
+=======
+
+>>>>>>> 3b001aeea4c5ceae9e7bb892e0440c524eabe236
             } catch (\Exception $e) {
                 return back()->with('message_error', 'Something went wrong: ' . $e->getMessage());
             }

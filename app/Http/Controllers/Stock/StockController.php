@@ -902,6 +902,7 @@ class StockController extends Controller
         // 'groupedStock' => $groupedStock // If you want grouped data
     ]);
    }
+<<<<<<< HEAD
 
    public function getItemUom(Request $request)
 {
@@ -919,5 +920,7 @@ class StockController extends Controller
         'uom_name' => $item->uom_name
     ]);
 }
+=======
+>>>>>>> 3b001aeea4c5ceae9e7bb892e0440c524eabe236
     
 }
