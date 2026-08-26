@@ -1,756 +1,801 @@
-<!-- page title -->
-@php $pageName = "dashboard"; $subpageName = ""; @endphp
+@php
+    $pageName = 'dashboard';
+    $subpageName = '';
+    $initials = strtoupper(collect(explode(' ', $userName))->filter()->take(2)->map(fn ($w) => substr($w, 0, 1))->join(''));
+    $todayLabel = now()->format('l, F j, Y');
+@endphp
 
 @extends('layouts.backendapp')
 
+@section('css')
+<style>
+    .db-page { padding: 0 0.5rem 2rem; }
+
+    .db-hero {
+        background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 50%, #6366f1 100%);
+        border-radius: 1.25rem;
+        padding: 2rem 2rem 2.25rem;
+        margin-bottom: 1.75rem;
+        position: relative;
+        overflow: hidden;
+        color: #fff;
+        box-shadow: 0 8px 32px rgba(37, 99, 235, 0.28);
+    }
+
+    .db-hero::before,
+    .db-hero::after {
+        content: '';
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .db-hero::before { width: 260px; height: 260px; top: -90px; right: -60px; }
+    .db-hero::after  { width: 160px; height: 160px; bottom: -50px; left: 10%; }
+
+    .db-hero-inner { position: relative; z-index: 1; }
+
+    .db-welcome-row {
+        display: flex;
+        align-items: center;
+        gap: 1.25rem;
+        flex-wrap: wrap;
+    }
+
+    .db-avatar {
+        width: 72px;
+        height: 72px;
+        border-radius: 1.125rem;
+        background: linear-gradient(135deg, rgba(255,255,255,0.25), rgba(255,255,255,0.08));
+        border: 2px solid rgba(255, 255, 255, 0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "SUSE", sans-serif;
+        font-weight: 800;
+        font-size: 1.5rem;
+        flex-shrink: 0;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+
+    .db-hero h1 {
+        font-family: "SUSE", sans-serif;
+        font-weight: 700;
+        font-size: clamp(1.5rem, 3.5vw, 2rem);
+        margin: 0 0 0.35rem;
+        letter-spacing: -0.02em;
+    }
+
+    .db-hero-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .db-meta-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.3rem 0.75rem;
+        border-radius: 2rem;
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        font-size: 0.78rem;
+        font-weight: 600;
+    }
+
+    .db-hero-date {
+        text-align: right;
+        margin-left: auto;
+    }
+
+    .db-hero-date .day {
+        font-family: "SUSE", sans-serif;
+        font-weight: 700;
+        font-size: 1.05rem;
+    }
+
+    .db-hero-date .sub {
+        font-size: 0.78rem;
+        opacity: 0.75;
+    }
+
+    @media (max-width: 767.98px) {
+        .db-hero-date { text-align: left; margin-left: 0; width: 100%; }
+    }
+
+    .stat-card {
+        border-radius: 1.125rem;
+        padding: 1.35rem 1.4rem;
+        height: 100%;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.07);
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+        animation: dbStatIn 0.5s ease both;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    .stat-card:nth-child(1) { animation-delay: 0.05s; }
+    .stat-card:nth-child(2) { animation-delay: 0.1s; }
+    .stat-card:nth-child(3) { animation-delay: 0.15s; }
+    .stat-card:nth-child(4) { animation-delay: 0.2s; }
+
+    @keyframes dbStatIn {
+        from { opacity: 0; transform: translateY(16px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .stat-card-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+    }
+
+    .stat-card-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 0.875rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    .stat-card.pending  .stat-card-icon { background: rgba(124, 58, 237, 0.12); color: #7c3aed; }
+    .stat-card.reorder  .stat-card-icon { background: rgba(234, 88, 12, 0.12); color: #ea580c; }
+    .stat-card.expiry   .stat-card-icon { background: rgba(220, 38, 38, 0.12); color: #dc2626; }
+    .stat-card.stock    .stat-card-icon { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
+
+    .stat-card.pending .stat-card-value { color: #7c3aed; }
+    .stat-card.reorder .stat-card-value { color: #ea580c; }
+    .stat-card.expiry  .stat-card-value { color: #dc2626; }
+    .stat-card.stock   .stat-card-value { color: #16a34a; }
+
+    .stat-card-value {
+        font-size: clamp(1.75rem, 4vw, 2.25rem);
+        font-weight: 800;
+        line-height: 1;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-card-label { font-size: 0.82rem; color: #64748b; margin: 0; }
+    .stat-card-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #2563eb;
+        text-decoration: none;
+        margin-top: 0.65rem;
+    }
+
+    .stat-card-link:hover { color: #1d4ed8; }
+
+    .db-panel {
+        border-radius: 1.25rem;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        background: #fff;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+        animation: dbStatIn 0.5s ease 0.25s both;
+        height: 100%;
+    }
+
+    .db-panel-head {
+        padding: 1.15rem 1.35rem;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .db-panel-head h5 {
+        font-family: "SUSE", sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+        margin: 0;
+    }
+
+    .db-panel-head small { color: #64748b; display: block; margin-top: 0.15rem; }
+
+    .count-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.28rem 0.7rem;
+        border-radius: 2rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
+    .count-badge.warn  { background: rgba(234, 88, 12, 0.12); color: #c2410c; }
+    .count-badge.danger { background: rgba(220, 38, 38, 0.12); color: #b91c1c; }
+    .count-badge.info   { background: rgba(37, 99, 235, 0.12); color: #1d4ed8; }
+
+    .req-table { width: 100%; border-collapse: collapse; }
+
+    .req-table th {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        padding: 0.75rem 1.35rem;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        white-space: nowrap;
+    }
+
+    .req-table td {
+        padding: 0.85rem 1.35rem;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 0.875rem;
+        vertical-align: middle;
+    }
+
+    .req-table tbody tr:hover { background: #fffbeb; }
+
+    .req-no-badge {
+        display: inline-block;
+        padding: 0.2rem 0.55rem;
+        border-radius: 0.375rem;
+        background: rgba(217, 119, 6, 0.1);
+        color: #b45309;
+        font-size: 0.78rem;
+        font-weight: 700;
+        font-family: monospace;
+    }
+
+    .store-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.2rem 0.55rem;
+        border-radius: 2rem;
+        background: rgba(99, 102, 241, 0.1);
+        color: #4f46e5;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .btn-issue-sm {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 0.5rem;
+        background: #d97706;
+        color: #fff;
+        font-size: 0.78rem;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .btn-issue-sm:hover { background: #b45309; color: #fff; }
+
+    .hod-wait-banner {
+        margin: 0 1.35rem 1rem;
+        padding: 0.75rem 1rem;
+        border-radius: 0.75rem;
+        background: rgba(37, 99, 235, 0.08);
+        border: 1px solid rgba(37, 99, 235, 0.15);
+        font-size: 0.82rem;
+        color: #1e40af;
+    }
+
+    .alert-list { list-style: none; padding: 0; margin: 0; }
+
+    .alert-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.85rem;
+        padding: 1rem 1.35rem;
+        border-bottom: 1px solid #f1f5f9;
+        transition: background 0.15s;
+    }
+
+    .alert-item:last-child { border-bottom: none; }
+    .alert-item:hover { background: #fafafa; }
+
+    .alert-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+
+    .alert-icon.reorder { background: rgba(234, 88, 12, 0.12); color: #ea580c; }
+    .alert-icon.expiry  { background: rgba(220, 38, 38, 0.12); color: #dc2626; }
+    .alert-icon.at-level { background: rgba(217, 119, 6, 0.12); color: #d97706; }
+
+    .alert-body h6 {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0 0 0.2rem;
+    }
+
+    .alert-body p {
+        margin: 0;
+        font-size: 0.78rem;
+        color: #64748b;
+        line-height: 1.45;
+    }
+
+    .alert-tag {
+        display: inline-block;
+        margin-top: 0.35rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 0.35rem;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .alert-tag.critical { background: #fef2f2; color: #b91c1c; }
+    .alert-tag.warning  { background: #fff7ed; color: #c2410c; }
+
+    .db-empty {
+        padding: 2.5rem 1.5rem;
+        text-align: center;
+        color: #64748b;
+    }
+
+    .db-empty i {
+        font-size: 2rem;
+        color: #22c55e;
+        margin-bottom: 0.75rem;
+        display: block;
+    }
+
+    .quick-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        padding: 1.15rem 1.35rem 1.35rem;
+    }
+
+    .quick-link {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 1rem;
+        border-radius: 1rem;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.2s ease;
+    }
+
+    .quick-link:hover {
+        border-color: #93c5fd;
+        background: #eff6ff;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.12);
+        color: inherit;
+    }
+
+    .quick-link-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.05rem;
+    }
+
+    .quick-link:nth-child(1) .quick-link-icon { background: rgba(37,99,235,0.12); color: #2563eb; }
+    .quick-link:nth-child(2) .quick-link-icon { background: rgba(124,58,237,0.12); color: #7c3aed; }
+    .quick-link:nth-child(3) .quick-link-icon { background: rgba(234,88,12,0.12); color: #ea580c; }
+    .quick-link:nth-child(4) .quick-link-icon { background: rgba(22,163,74,0.12); color: #16a34a; }
+    .quick-link:nth-child(5) .quick-link-icon { background: rgba(8,145,178,0.12); color: #0891b2; }
+    .quick-link:nth-child(6) .quick-link-icon { background: rgba(217,119,6,0.12); color: #d97706; }
+
+    .quick-link span {
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .quick-link small {
+        font-size: 0.68rem;
+        color: #94a3b8;
+        line-height: 1.3;
+    }
+
+    .expiry-scroll {
+        max-height: 420px;
+        overflow-y: auto;
+    }
+</style>
+@endsection
+
 @section('content')
-                            <div class="container-fluid py-3">
-                                <div class="row gx-3 gx-lg-4 align-items-center page-title">
-                                    <div class="col col-sm mb-3 mb-sm-0 order-1">
-                                        <h5 class="mb-0">My Dashboard</h5>
-                                        <p class="text-secondary small">This is my personal dasbboard</p>
-                                    </div>
-                                    <div class="col-12 col-sm-auto order-3 order-sm-2">
-                                        <div class="input-group input-group-md width-250">
-                                            <input type="text" class="form-control bg-transparent" value="" id="daterangepickerranges">
-                                            <span class="input-group-text text-theme-1 bg-transparent" id="titlecalendar" onclick="this.previousElementSibling.click()"><i class="bi bi-calendar-event"></i></span>
+
+<div class="container-fluid db-page px-3 px-lg-4 mt-3">
+
+    <div class="db-hero">
+        <div class="db-hero-inner">
+            <div class="db-welcome-row">
+                <div class="db-avatar">{{ $initials ?: 'SS' }}</div>
+                <div>
+                    <h1>Welcome back, {{ $userName }}</h1>
+                    <p class="mb-0 opacity-75">Here’s what’s happening across your inventory today.</p>
+                    <div class="db-hero-meta">
+                        <span class="db-meta-pill"><i class="bi bi-person-badge"></i> {{ $userRole }}</span>
+                        @if($activeStore)
+                            <span class="db-meta-pill"><i class="bi bi-shop"></i> {{ $activeStore->name }}</span>
+                        @endif
                                         </div>
                                     </div>
-                                    <div class="col-auto ps-0 position-relative order-2 order-sm-3 mb-3 mb-sm-0">
-                                        <div class="dropdown d-inline-block">
-                                            <a class="btn btn-link btn-square no-caret dropdown-toggle" href="#" role="button" id="filterintitle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
-                                                <i class="bi bi-filter"></i>
-                                            </a>
-                                            <div class="dropdown-menu width-300" aria-labelledby="filterintitle">
-                                                <div class="p-1 mb-2">
-                                                    <div class="input-group input-group-md rounded" style="--mw-dynamic:234px">
-                                                        <span class="input-group-text text-theme-1"><i class="bi bi-box"></i></span>
-                                                        <select class="form-control choices" id="titltfilterlist" multiple>
-                                                            <option value="San Francisco">San Francisco</option>
-                                                            <option value="New York">New York</option>
-                                                            <option value="London">London</option>
-                                                            <option value="Chicago">Chicago</option>
-                                                            <option value="India" selected="">India</option>
-                                                            <option value="Sydney">Sydney</option>
-                                                            <option value="Seattle">Seattle</option>
-                                                            <option value="Los Angeles">Los Angeles</option>
-                                                            <option value="Indonesia">Indonesia</option>
-                                                            <option value="Los Angeles">Los Angeles</option>
-                                                            <option value="Chicago">Chicago</option>
-                                                            <option value="India">India</option>
-                                                        </select>
-                                                    </div>
-                                                    <div class="invalid-feedback">You have already selected maximum option allowed. (This is Configurable)</div>
+                <div class="db-hero-date">
+                    <div class="day">{{ now()->format('M j') }}</div>
+                    <div class="sub">{{ $todayLabel }}</div>
                                                 </div>
-                                                <div class="p-1">
-                                                    <h6 class="mb-0">Orders:</h6>
-                                                    <p class="text-secondary small">1256 orders last week</p>
-                                                </div>
-                                                <ul class="list-group list-group-flush bg-transparent border-0 mb-2">
-                                                    <li class="list-group-item">
-                                                        <div class="row gx-3 gx-lg-4">
-                                                            <div class="col">Online Orders</div>
-                                                            <div class="col-auto">
-                                                                <div class="form-check form-switch">
-                                                                    <input class="form-check-input" type="checkbox" role="switch" id="titleswitch1">
-                                                                    <label class="form-check-label" for="titleswitch1"></label>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    </li>
-                                                    <li class="list-group-item">
-                                                        <div class="row gx-3 gx-lg-4">
-                                                            <div class="col">Offline Orders</div>
-                                                            <div class="col-auto">
-                                                                <div class="form-check form-switch">
-                                                                    <input class="form-check-input" type="checkbox" role="switch" id="titleswitch2" checked="">
-                                                                    <label class="form-check-label" for="titleswitch2"></label>
+
+    <div class="row g-3 mb-3">
+        <div class="col-sm-6 col-xl-3">
+            <div class="stat-card pending">
+                <div class="stat-card-top">
+                    <div class="stat-card-icon"><i class="bi bi-hourglass-split"></i></div>
+                </div>
+                <div class="stat-card-value">{{ number_format($pendingStockCount) }}</div>
+                <p class="stat-card-label">Pending Stock Entries</p>
+                <a href="{{ route('pendingStock') }}" class="stat-card-link">View pending <i class="bi bi-arrow-right"></i></a>
                                                                 </div>
                                                             </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="stat-card reorder">
+                <div class="stat-card-top">
+                    <div class="stat-card-icon"><i class="bi bi-exclamation-triangle"></i></div>
                                                         </div>
-                                                    </li>
-                                                </ul>
-                                                <div class="p-1">
-                                                    <div class="row gx-3 gx-lg-4">
-                                                        <div class="col"><button class="btn btn-outline-secondary border ddclose">cancel</button></div>
-                                                        <div class="col-auto">
-                                                            <button class="btn btn-theme">Save</button>
+                <div class="stat-card-value">{{ number_format($reorderItemsCount) }}</div>
+                <p class="stat-card-label">Re-order Alerts</p>
+                <a href="{{ route('reOrder') }}" class="stat-card-link">Manage levels <i class="bi bi-arrow-right"></i></a>
                                                         </div>
                                                     </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="stat-card expiry">
+                <div class="stat-card-top">
+                    <div class="stat-card-icon"><i class="bi bi-calendar-x"></i></div>
+                </div>
+                <div class="stat-card-value">{{ number_format($count) }}</div>
+                <p class="stat-card-label">Expiring in 3 Months</p>
                                                 </div>
                                             </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="stat-card stock">
+                <div class="stat-card-top">
+                    <div class="stat-card-icon"><i class="bi bi-box-seam"></i></div>
                                         </div>
-                                        <a href="adminux-company-help-center.html" class="btn btn-link btn-square" data-bs-toggle="tooltip" data-bs-placement="top" id="stylise">
-                                            <i class="bi bi-life-preserver"></i>
-                                        </a>
-                                        <a href="https://1.envato.market/7N7Br" target="_blank" class="btn btn-link btn-square" data-bs-toggle="tooltip" data-bs-placement="top">
-                                            <span class="bi bi-basket position-relative">
-                                                <span class="position-absolute top-0 start-100 p-1 bg-danger border border-light rounded-circle">
-                                                    <span class="visually-hidden">New alerts</span>
-                                                </span>
-                                            </span>
-                                        </a>
+                <div class="stat-card-value">{{ number_format($totalStockQty) }}</div>
+                <p class="stat-card-label">Total Stock Units</p>
+                <span class="stat-card-link text-muted" style="cursor:default;">{{ number_format($approvedStockLines) }} batch lines</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- content -->
-                            <div class="container mt-3" id="main-content">
-                                <!-- welcome bar -->
-                                <div class="row gx-3 gx-lg-4 align-items-center">
-
-                                    <!-- welcome message -->
-                                    <div class="col-12 col-md mb-3 mb-lg-4">
-                                        <p class="h2 fw-normal mb-0">Welcome,</p>
-                                        <h1 class="display-3 fw-medium text-gradient">Stock Shield</h1>
-
-                                        <!-- Swiper daily quote -->
-                                        <div class="swiper mt-4 swipernav">
-                                            <div class="swiper-wrapper">
-                                                {{-- <div class="swiper-slide">
-                                                    <div class="row gx-3 gx-xl-4">
-                                                        <div class="col-auto">
-                                                            <i class="bi bi-cake fs-5 avatar avatar-50 rounded-circle bg-theme-1-subtle text-theme-1 theme-pink"></i>
+    @if($isCentralStore)
+    <div class="row g-3 mb-3">
+        <div class="col-12">
+            <div class="db-panel">
+                <div class="db-panel-head">
+                    <div>
+                        <h5><i class="bi bi-truck me-2 text-warning"></i>Incoming Requisitions</h5>
+                        <small>Satellite stores requesting stock from {{ $activeStore->name ?? 'your central store' }}</small>
                                                         </div>
-                                                        <div class="col">
-                                                            <a href="https://www.adminuiux.com/adminuiux/adminux/html/adminuiux-profile-professional.html" class="style-none rounded-5 bg-theme-l-gradient p-1 d-inline-block mb-1 me-2">
-                                                                <figure class="avatar avatar-30 rounded-circle me-1 coverimg"><img src="assets/img/modern-ai-image/user-4.jpg" alt=""></figure>
-                                                                James Wang <i class="bi bi-chat-right-dots vm mx-2"></i>
-                                                            </a>
-                                                            <a href="https://www.adminuiux.com/adminuiux/adminux/html/adminuiux-profile-professional.html" class="style-none rounded-5 bg-theme-l-gradient p-1 d-inline-block mb-1 me-2">
-                                                                <figure class="avatar avatar-30 rounded-circle me-1 coverimg"><img src="assets/img/modern-ai-image/user-2.jpg" alt=""></figure>
-                                                                Millie Tyson <i class="bi bi-chat-right-dots vm mx-2"></i>
-                                                            </a>
-                                                            <p class="text-secondary">Your 5 partner and our CEO's <span class="fw-bold">birthday</span> today.</p>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        @if($awaitingHodCount > 0)
+                            <span class="count-badge info">{{ $awaitingHodCount }} awaiting HOD</span>
+                        @endif
+                        @if($pendingRequisitionCount > 0)
+                            <span class="count-badge warn">{{ $pendingRequisitionCount }} ready to issue</span>
+                        @endif
                                                         </div>
                                                     </div>
-                                                </div> --}}
-                                                 @foreach($reorderItems as $item)
 
-                                                 @if($item->total_qty  == $item->reorder_level)
-                                                <div class="swiper-slide">
-                                                    <div class="row gx-3 gx-xl-4">
-                                                        <div class="col-auto">
-                                                            <i class="bi bi-quote fs-4 avatar avatar-50 rounded-circle bg-theme-1-subtle text-theme-1 theme-grey"></i>
+                @if($awaitingHodCount > 0)
+                    <div class="hod-wait-banner">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <strong>{{ $awaitingHodCount }}</strong> requisition{{ $awaitingHodCount !== 1 ? 's' : '' }}
+                        ({{ $awaitingHodRequisitions->sum('line_count') }} items) awaiting HOD approval before you can issue.
                                                         </div>
-                                                        <div class="col">
-                                                            <h5 class="mb-1">{{ $item->name }}</h5>
-                                                            <p class="text-secondary">reached re-order level please re-stock to continue issuing</p>
+                @endif
+
+                @if($incomingRequisitions->isNotEmpty())
+                    <div class="table-responsive">
+                        <table class="req-table">
+                            <thead>
+                                <tr>
+                                    <th>Requisition No</th>
+                                    <th>Requesting Store</th>
+                                    <th>Items</th>
+                                    <th>Approved Qty</th>
+                                    <th>Submitted</th>
+                                    <th>Requested By</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($incomingRequisitions->take(10) as $req)
+                                    <tr>
+                                        <td><span class="req-no-badge">{{ $req->requisition_no }}</span></td>
+                                        <td>
+                                            <span class="store-chip">
+                                                <i class="bi bi-shop"></i>
+                                                {{ $req->requesting_store->name ?? '—' }}
+                                            </span>
+                                        </td>
+                                        <td>{{ $req->line_count }}</td>
+                                        <td><strong>{{ number_format($req->total_qty) }}</strong></td>
+                                        <td>
+                                            {{ $req->submitted_at?->format('M d, Y') }}
+                                            <div class="text-muted small">{{ $req->submitted_at?->format('h:i A') }}</div>
+                                        </td>
+                                        <td>{{ $req->requested_by->name ?? '—' }}</td>
+                                        <td>
+                                            <a href="{{ route('viewStoreRequest', Crypt::encrypt($req->requisition_no)) }}"
+                                               class="btn-issue-sm">
+                                                <i class="bi bi-box-arrow-right"></i> Issue
+                                            </a>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                                                         </div>
+                    @if($pendingRequisitionCount > 10)
+                        <div class="p-3 border-top text-center">
+                            <a href="{{ route('IssueItem') }}" class="stat-card-link">
+                                View all {{ $pendingRequisitionCount }} requisitions <i class="bi bi-arrow-right"></i>
+                            </a>
                                                     </div>
+                    @endif
+                @else
+                    <div class="db-empty">
+                        <i class="bi bi-inbox"></i>
+                        <p class="mb-0">No approved requisitions waiting to be issued.</p>
                                                 </div>
-                                                @elseif($item->total_qty  < $item->reorder_level)
-                                                <div class="swiper-slide">
-                                                    <div class="row gx-3 gx-xl-4">
-                                                        <div class="col-auto">
-                                                            <i class="bi bi-quote fs-4 avatar avatar-50 rounded-circle bg-theme-1-subtle text-theme-1 theme-grey"></i>
-                                                        </div>
-                                                        <div class="col">
-                                                            <h5 class="mb-1">{{ $item->name }}</h5>
-                                                            <p class="text-secondary">is below re-order level please   re-stock to continue issuing</p>
+                @endif
                                                         </div>
                                                     </div>
                                                 </div>
                                                  @endif
 
-                                                @endforeach
+    @if($isSatelliteStore ?? false)
+    <div class="row g-3 mb-3">
+        <div class="col-12">
+            <div class="db-panel">
+                <div class="db-panel-head">
+                    <div>
+                        <h5><i class="bi bi-box-arrow-in-down me-2 text-success"></i>Incoming Stock to Accept</h5>
+                        <small>Items issued from central stores awaiting receipt at {{ $activeStore->name ?? 'your store' }}</small>
                                             </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- rank and progress -->
-                                    <div class="col-12 col-md-auto col-xl-4 col-xxl-3 ms-auto align-self-center">
-                                        <div class="row gx-3 gx-lg-4 mb-3 mb-lg-4">
-                                            <div class="col col-md col-lg text-center">
-                                                <i class="bi bi-trophy h5 avatar avatar-50 bg-theme-r-gradient theme-purple text-white rounded-circle mb-2"></i>
-                                                <h3 class="increamentcount mb-0">{{ $reorderItemsCount }}</h3>
-                                                <p class="small text-secondary text-truncated">Re-orderlevel </p>
-                                            </div>
-                                            <div class="col col-md col-lg text-center">
-                                                <i class="bi bi-award h5 avatar avatar-50 bg-theme-r-gradient theme-orange text-white rounded-circle mb-2"></i>
-                                                <h3 class="increamentcount mb-0">{{ $count }}</h3>
-                                                <p class="small text-secondary text-truncated">Expiry</p>
-                                            </div>
-                                            <div class="col col-md col-lg text-center">
-                                                <i class="bi bi-clipboard-check h5 avatar avatar-50 bg-theme-r-gradient theme-teal text-white rounded-circle mb-2"></i>
-                                                <h3 class="increamentcount mb-0">1356</h3>
-                                                <p class="small text-secondary text-truncated">Tasks Done</p>
-                                            </div>
-                                        </div>
-                                        {{-- <div class="row gx-3 gx-lg-4 align-items-center mb-3 mb-lg-4">
-                                            <div class="col-auto">
-                                                <i class="bi bi-star h5 avatar avatar-50 bg-theme-1 text-white theme-yellow rounded-circle"></i>
-                                            </div>
-                                            <div class="col">
-                                                <p class="mb-2">Earn 500 points</p>
-                                                <div class="progress height-dynamic mb-1 bg-theme-1-subtle" style="--h-dynamic:5px">
-                                                    <div class="progress-bar bg-theme-1" role="progressbar" style="width: 25%" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
-                                                </div>
-                                                <p class="text-secondary small"><a href="https://www.adminuiux.com/adminuiux/adminux/html/profile-settings.html" class="style-none">Complete your profile</a></p>
-                                            </div>
-                                        </div> --}}
-                                    </div>
-
-                                    <!-- Tips swiper message -->
-                                    <div class="col-auto col-xl-3 d-none d-xxl-block h-100 mb-3 mb-lg-4">
-                                        <div class="card adminuiux-card shadow-sm h-100 bg-r-gradient theme-yellow">
-                                            <div class="card-header">
-                                                <div class="row gx-3 gx-lg-4 align-items-center">
-                                                    <div class="col">
-                                                        <h6>
-                                                            <i class="bi bi-lightbulb text-warning me-1"></i>
-                                                           {{ $count }} Product(s) to Expiry in 3 months
-                                                        </h6>
+                    @if(($pendingReceiptCount ?? 0) > 0)
+                        <span class="count-badge warn">{{ $pendingReceiptCount }} line(s)</span>
+                    @endif
                                                     </div>
                                                      
-                                                </div>
-                                            </div>
-                                            <div class="card-body">
-                                                <!-- image swiper -->
-                                                <div class="swiper swipernav width-200 h-100 text-center">
-                                                    <div class="swiper-wrapper">
-                                                        @foreach ($notifications as $listnote)
-                                                            
-                                                        
-                                                        <div class="swiper-slide">
-                                                            <i class="bi bi-chat-right-dots h4 text-success mb-3 d-block"></i>
-                                                            <h6>{{ $listnote->name }}</h6>
-                                                            <p class="small text-secondary">Will expire in about <b>{{ $listnote->days_left }} day(s)</b> time kindly take note.</p>
-                                                        </div>
+                @if(($incomingTransfers ?? collect())->isNotEmpty())
+                    <div class="table-responsive">
+                        <table class="req-table">
+                            <thead>
+                                <tr>
+                                    <th>Requisition No</th>
+                                    <th>From (Central)</th>
+                                    <th>Lines</th>
+                                    <th>Qty</th>
+                                    <th>Issued</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($incomingTransfers->take(10) as $transfer)
+                                    <tr>
+                                        <td><span class="req-no-badge">{{ $transfer->requisition_no }}</span></td>
+                                        <td>
+                                            <span class="store-chip">
+                                                <i class="bi bi-building"></i>
+                                                {{ $transfer->central_store->name ?? 'Central' }}
+                                            </span>
+                                        </td>
+                                        <td>{{ $transfer->line_count }}</td>
+                                        <td><strong>{{ number_format($transfer->total_qty) }}</strong></td>
+                                        <td>
+                                            {{ $transfer->issued_at?->format('M d, Y') }}
+                                            <div class="text-muted small">{{ $transfer->issued_at?->format('h:i A') }}</div>
+                                        </td>
+                                        <td>
+                                            <a href="{{ route('viewReceiveStock', Crypt::encrypt($transfer->requisition_no)) }}"
+                                               class="btn-issue-sm" style="background:#059669;">
+                                                <i class="bi bi-check2-square"></i> Accept
+                                            </a>
+                                        </td>
+                                    </tr>
                                                         @endforeach
-                                                        
-                                                         
-                                                         
+                            </tbody>
+                        </table>
                                                     </div>
+                    <div class="p-3 border-top text-center">
+                        <a href="{{ route('ReceiveStock') }}" class="stat-card-link">
+                            Open Receive Stock
+                            @if(($pendingReceiptQty ?? 0) > 0)
+                                ({{ number_format($pendingReceiptQty) }} units pending)
+                            @endif
+                            <i class="bi bi-arrow-right"></i>
+                        </a>
+                                                        </div>
+                @else
+                    <div class="db-empty">
+                        <i class="bi bi-inbox"></i>
+                        <p class="mb-0">No issued stock waiting to be accepted.</p>
+                                                    </div>
+                @endif
                                                 </div>
-                                                <!-- image swiper ends -->
                                             </div>
                                         </div>
+    @endif
+
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="db-panel">
+                        <div class="db-panel-head">
+                            <div>
+                                <h5><i class="bi bi-arrow-repeat me-2 text-warning"></i>Re-order Alerts</h5>
+                                <small>Items at or below reorder level</small>
+                                    </div>
+                            @if($reorderItemsCount > 0)
+                                <span class="count-badge warn">{{ $reorderItemsCount }}</span>
+                            @endif
+                                                            </div>
+                        @if($reorderItems->isNotEmpty())
+                            <ul class="alert-list">
+                                @foreach($reorderItems->take(8) as $item)
+                                    @php
+                                        $isCritical = $item->total_qty < $item->reorder_level;
+                                    @endphp
+                                    <li class="alert-item">
+                                        <div class="alert-icon {{ $isCritical ? 'reorder' : 'at-level' }}">
+                                            <i class="bi bi-{{ $isCritical ? 'arrow-down-circle' : 'dash-circle' }}"></i>
+                                        </div>
+                                        <div class="alert-body">
+                                            <h6>{{ $item->name }}</h6>
+                                            <p>
+                                                Stock: <strong>{{ number_format($item->total_qty) }}</strong>
+                                                &middot; Reorder level: {{ number_format($item->reorder_level) }}
+                                            </p>
+                                            <span class="alert-tag {{ $isCritical ? 'critical' : 'warning' }}">
+                                                {{ $isCritical ? 'Below level' : 'At level' }}
+                                            </span>
+                                        </div>
+                                    </li>
+                                @endforeach
+                                                            </ul>
+                        @else
+                            <div class="db-empty">
+                                <i class="bi bi-check-circle"></i>
+                                <p class="mb-0">All items are above reorder levels.</p>
+                                                        </div>
+                        @endif
                                     </div>
                                 </div>
 
-                                <!-- content -->
-                                <div class="row gx-3 gx-lg-4">
-                                    <!-- summary blocks -->
-                                    <div class="col-12 col-md-6 col-lg-6 col-xxl-3">
-                                        <div class="card adminuiux-card shadow-sm mb-3 mb-lg-4">
-                                            <div class="card-body">
-                                                <div class="row gx-3 gx-lg-4 align-items-center">
-                                                    <div class="col-auto">
-                                                        <div class="position-relative">
-                                                            <div id="circleprogressblue" class="avatar avatar-60"></div>
-                                                            <div class="avatar avatar-40 h5 bg-theme-1-subtle text-theme-1 rounded-circle position-absolute top-50 start-50 translate-middle">
-                                                                <i class="bi bi-calendar2-check"></i>
-                                                            </div>
-                                                        </div>
+                <div class="col-md-6">
+                    <div class="db-panel">
+                        <div class="db-panel-head">
+                            <div>
+                                <h5><i class="bi bi-calendar-event me-2 text-danger"></i>Expiry Watch</h5>
+                                <small>Products expiring within 3 months</small>
+                                    </div>
+                            @if($count > 0)
+                                <span class="count-badge danger">{{ $count }}</span>
+                            @endif
                                                     </div>
-                                                    <div class="col">
-                                                        <p class="text-secondary small mb-1">Task Completed</p>
-                                                        <h5>60<small>%</small></h5>
-                                                    </div>
-                                                    <div class="col-auto">
-                                                        <div class="dropdown d-inline-block">
-                                                            <a class="text-secondary no-caret" data-bs-toggle="dropdown" aria-expanded="false" data-bs-display="static" role="button">
-                                                                <i class="bi bi-three-dots-vertical"></i>
-                                                            </a>
-                                                            <ul class="dropdown-menu dropdown-menu-end">
-                                                                <li><a class="dropdown-item" href="javascript:void(0)">Edit</a></li>
-                                                                <li><a class="dropdown-item" href="javascript:void(0)">Move</a></li>
-                                                                <li><a class="dropdown-item text-danger" href="javascript:void(0)">Delete</a></li>
-                                                            </ul>
-                                                        </div>
-                                                    </div>
-                                                </div>
+                        @if($notifications->isNotEmpty())
+                            <div class="expiry-scroll">
+                                <ul class="alert-list">
+                                    @foreach($notifications->take(10) as $note)
+                                        <li class="alert-item">
+                                            <div class="alert-icon expiry">
+                                                <i class="bi bi-clock-history"></i>
                                             </div>
+                                            <div class="alert-body">
+                                                <h6>{{ $note->name }}</h6>
+                                                <p>
+                                                    Qty {{ number_format($note->qty) }}
+                                                    &middot; Expires {{ \Carbon\Carbon::parse($note->expiry_date)->format('M d, Y') }}
+                                                </p>
+                                                <span class="alert-tag {{ $note->days_left <= 30 ? 'critical' : 'warning' }}">
+                                                    {{ $note->days_left }} day{{ $note->days_left !== 1 ? 's' : '' }} left
+                                                </span>
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                                            </div>
+                        @else
+                            <div class="db-empty">
+                                <i class="bi bi-shield-check"></i>
+                                <p class="mb-0">No items expiring in the next 3 months.</p>
                                         </div>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-6 col-xxl-3">
-                                        <div class="card adminuiux-card shadow-sm mb-3 mb-lg-4">
-                                            <div class="card-body">
-                                                <div class="row gx-3 gx-lg-4 align-items-center">
-                                                    <div class="col-auto">
-                                                        <div class="position-relative">
-                                                            <div id="circleprogressyellow" class="avatar avatar-60"></div>
-                                                            <div class="avatar avatar-40 h5 bg-theme-1-subtle text-theme-1 theme-yellow rounded-circle position-absolute top-50 start-50 translate-middle">
-                                                                <i class="bi bi-building"></i>
-                                                            </div>
+                        @endif
                                                         </div>
                                                     </div>
-                                                    <div class="col">
-                                                        <p class="text-secondary small mb-1">Construction</p>
-                                                        <h5>12550<small>USD</small></h5>
-                                                    </div>
-                                                    <div class="col-auto">
-                                                        <div class="dropdown d-inline-block">
-                                                            <a class="text-secondary no-caret" data-bs-toggle="dropdown" aria-expanded="false" data-bs-display="static" role="button">
-                                                                <i class="bi bi-three-dots-vertical"></i>
-                                                            </a>
-                                                            <ul class="dropdown-menu dropdown-menu-end">
-                                                                <li><a class="dropdown-item" href="javascript:void(0)">Edit</a></li>
-                                                                <li><a class="dropdown-item" href="javascript:void(0)">Move</a></li>
-                                                                <li><a class="dropdown-item text-danger" href="javascript:void(0)">Delete</a></li>
-                                                            </ul>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-6 col-xxl-3">
-                                        <div class="card adminuiux-card shadow-sm mb-3 mb-lg-4">
-                                            <div class="card-body">
-                                                <div class="row gx-3 gx-lg-4 align-items-center">
-                                                    <div class="col-auto">
-                                                        <div class="avatar avatar-60 h5 bg-theme-1-subtle text-theme-1 theme-red rounded-circle">
-                                                            <i class="bi bi-emoji-heart-eyes"></i>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col">
-                                                        <p class="text-secondary small mb-1">Event Joined</p>
-                                                        <h5>1525<small>k</small></h5>
-                                                    </div>
-                                                    <div class="col-auto">
-                                                        <div class="dropdown d-inline-block">
-                                                            <a class="text-secondary no-caret" data-bs-toggle="dropdown" aria-expanded="false" data-bs-display="static" role="button">
-                                                                <i class="bi bi-three-dots-vertical"></i>
-                                                            </a>
-                                                            <ul class="dropdown-menu dropdown-menu-end">
-                                                                <li><a class="dropdown-item" href="javascript:void(0)">Edit</a></li>
-                                                                <li><a class="dropdown-item" href="javascript:void(0)">Move</a></li>
-                                                                <li><a class="dropdown-item text-danger" href="javascript:void(0)">Delete</a></li>
-                                                            </ul>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-6 col-xxl-3">
-                                        <div class="card adminuiux-card shadow-sm mb-3 mb-lg-4">
-                                            <div class="card-body">
-                                                <div class="row gx-3 gx-lg-4 align-items-center">
-                                                    <div class="col-auto">
-                                                        <div class="avatar avatar-60 h5 bg-theme-1 theme-green text-white rounded-circle">
-                                                            <i class="bi bi-thermometer-sun"></i>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col">
-                                                        <p class="text-secondary small mb-1">Temperature</p>
-                                                        <h5>45 <small><sup>0</sup>C, Room-32</small></h5>
-                                                    </div>
-                                                    <div class="col-auto">
-                                                        <div class="dropdown d-inline-block">
-                                                            <a class="text-secondary no-caret" data-bs-toggle="dropdown" aria-expanded="false" data-bs-display="static" role="button">
-                                                                <i class="bi bi-three-dots-vertical"></i>
-                                                            </a>
-                                                            <ul class="dropdown-menu dropdown-menu-end">
-                                                                <li><a class="dropdown-item" href="javascript:void(0)">Edit</a></li>
-                                                                <li><a class="dropdown-item" href="javascript:void(0)">Move</a></li>
-                                                                <li><a class="dropdown-item text-danger" href="javascript:void(0)">Delete</a></li>
-                                                            </ul>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {{-- <div class="row gx-3 gx-lg-4 mb-3 mb-lg-4">
-                                    <div class="col text-center py-3">
-                                        <h4>The sort <span class="text-gradient">summary</span> may help you</h4>
-                                        <p class="text-secondary">Keep yourself updated, No matter how much workload is.</p>
-                                    </div>
-                                </div> --}}
-
-                                {{-- <div class="row gx-3 gx-lg-4">
-                                    <div class="col-12 col-md-6 col-lg-6 col-xxl-3 mb-3 mb-lg-4">
-                                        <!-- finance card -->
-                                        <div class="card adminuiux-card shadow-sm bg-l-gradient-light theme-blue">
-                                            <div class="card-header">
-                                                <div class="row gx-3 gx-lg-4 align-items-center">
-                                                    <div class="col">
-                                                        <h6>
-                                                            <i class="bi bi-cash h5 me-1 avatar avatar-40 bg-theme-1-subtle text-theme-1 rounded me-2"></i>
-                                                            Finance
-                                                        </h6>
-                                                    </div>
-                                                    <div class="col-auto">
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="swiper swipernav mb-3 mb-lg-4">
-                                                    <div class="swiper-wrapper">
-                                                        <div class="swiper-slide width-240">
-                                                            <div class="card adminuiux-card shadow-sm mb-2 theme-blue bg-theme-r-gradient overflow-hidden">
-                                                                <div class="coverimg top-0 start-0 h-100 w-100 position-absolute z-index-0 opacity-25">
-                                                                    <img src="assets/img/modern-ai-image/peacoke-2.jpg" alt="" style="display: none;">
-                                                                </div>
-                                                                <div class="card-body position-relative z-index-1">
-                                                                    <div class="row gx-3 align-items-center mb-4">
-                                                                        <div class="col-auto align-self-center">
-                                                                            <i class="bi bi-amazon fs-4"></i>
-                                                                        </div>
-                                                                        <div class="col text-end">
-                                                                            <p class="fs-12">
-                                                                                <span class="opacity-50 small">City Bank</span><br>
-                                                                                <span class="">Credit Card</span>
-                                                                            </p>
-                                                                        </div>
-                                                                    </div>
-                                                                    <p class="fw-medium h6 mb-3">
-                                                                        000 0000 0001 546598
-                                                                    </p>
-                                                                    <div class="row gx-3 gx-lg-4">
-                                                                        <div class="col-auto fs-12">
-                                                                            <p class="mb-0 opacity-50 small">Expiry</p>
-                                                                            <p>09/023</p>
-                                                                        </div>
-                                                                        <div class="col text-end fs-12">
-                                                                            <p class="mb-0 opacity-50 small">Card Holder</p>
-                                                                            <p>AdminUIUX</p>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="row amount-data">
-                                                                <div class="col">
-                                                                    <p class="opacity-50 small mb-1">Expense</p>
-                                                                    <p>1500.00 <small class="text-success">18.0% <i class="bi bi-arrow-up"></i></small></p>
-                                                                </div>
-                                                                <div class="col-auto text-end">
-                                                                    <p class="opacity-50 small mb-1">Limit Remain</p>
-                                                                    <p>13500.00</p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="swiper-slide width-240">
-                                                            <div class="card adminuiux-card shadow-sm theme-pink bg-theme-r-gradient mb-2 overflow-hidden">
-                                                                <div class="coverimg top-0 start-0 h-100 w-100 position-absolute z-index-0 opacity-25">
-                                                                    <img src="assets/img/modern-ai-image/flamingo-2.jpg" alt="" style="display: none;">
-                                                                </div>
-                                                                <div class="card-body position-relative z-index-1">
-                                                                    <div class="row gx-3 align-items-center mb-4">
-                                                                        <div class="col-auto align-self-center">
-                                                                            <i class="bi bi-apple fs-4"></i>
-                                                                        </div>
-                                                                        <div class="col text-end">
-                                                                            <p class="fs-12">
-                                                                                <span class="opacity-50 small">City Bank</span><br>
-                                                                                <span class="">Credit Card</span>
-                                                                            </p>
-                                                                        </div>
-                                                                    </div>
-                                                                    <p class="fw-medium h6 mb-3">
-                                                                        000 0000 0001 546598
-                                                                    </p>
-                                                                    <div class="row gx-3 gx-lg-4">
-                                                                        <div class="col-auto fs-12">
-                                                                            <p class="mb-0 opacity-50 small">Expiry</p>
-                                                                            <p>09/023</p>
-                                                                        </div>
-                                                                        <div class="col text-end fs-12">
-                                                                            <p class="mb-0 opacity-50 small">Card Holder</p>
-                                                                            <p>AdminUIUX</p>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="row amount-data">
-                                                                <div class="col">
-                                                                    <p class="text-secondary small mb-1">Expense</p>
-                                                                    <p>3650.00 <small class="text-danger">11.0% <i class="bi bi-arrow-down"></i></small></p>
-                                                                </div>
-                                                                <div class="col-auto text-end">
-                                                                    <p class="text-secondary small mb-1">Limit Remain</p>
-                                                                    <p>35500.00</p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="swiper-slide width-240">
-                                                            <div class="card adminuiux-card shadow-sm theme-yellow bg-r-gradient mb-2">
-                                                                <div class="card-body">
-                                                                    <div class="row gx-3 align-items-center mb-4">
-                                                                        <div class="col-auto align-self-center">
-                                                                            <i class="bi bi-amazon fs-4"></i>
-                                                                        </div>
-                                                                        <div class="col text-end">
-                                                                            <p class="fs-12">
-                                                                                <span class="opacity-50 small">City Bank</span><br>
-                                                                                <span class="">Credit Card</span>
-                                                                            </p>
-                                                                        </div>
-                                                                    </div>
-                                                                    <p class="fw-medium h6 mb-3">
-                                                                        000 0000 0001 546598
-                                                                    </p>
-                                                                    <div class="row gx-3 gx-lg-4">
-                                                                        <div class="col-auto fs-12">
-                                                                            <p class="mb-0 opacity-50 small">Expiry</p>
-                                                                            <p>09/023</p>
-                                                                        </div>
-                                                                        <div class="col text-end fs-12">
-                                                                            <p class="mb-0 opacity-50 small">Card Holder</p>
-                                                                            <p>AdminUIUX</p>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="row amount-data">
-                                                                <div class="col">
-                                                                    <p class="text-secondary small mb-1">Expense</p>
-                                                                    <p>1500.00 <small class="text-success">18.0 <i class="bi bi-arrow-up"></i></small></p>
-                                                                </div>
-                                                                <div class="col-auto text-end">
-                                                                    <p class="text-secondary small mb-1">Limit Remain</p>
-                                                                    <p>13500.00</p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="card adminuiux-card">
-                                                    <div class="card-body">
-                                                        <div class="row gx-3 align-items-center">
-                                                            <div class="col-auto">
-                                                                <div class="avatar avatar-50 h5 bg-theme-1-subtle text-theme-1 rounded-circle">
-                                                                    <i class="bi bi-receipt"></i>
-                                                                </div>
-                                                            </div>
-                                                            <div class="col">
-                                                                <p class="text-secondary small mb-1">Billed Amount</p>
-                                                                <h5>1525 <small>USD</small></h5>
-                                                            </div>
-                                                            <div class="col-auto">
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="card-footer justify-content-center text-center">
-                                                <a href="https://www.adminuiux.com/adminuiux/adminux/html/finance-dashboard.html" class="btn btn-sm btn-link">Visit Finance Dashboard <i class="bi bi-arrow-right vm"></i></a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-6 col-xxl-3 mb-4">
-                                        <!-- Inventory card -->
-                                        <div class="card adminuiux-card shadow-sm bg-l-gradient-light theme-yellow h-100">
-                                            <div class="card-header">
-                                                <div class="row gx-3 gx-lg-4 align-items-center">
-                                                    <div class="col">
-                                                        <h6>
-                                                            <i class="bi bi-box h5 me-1 avatar avatar-40 bg-theme-1-subtle text-theme-1 rounded me-2"></i>
-                                                            Inventory
-                                                        </h6>
-                                                    </div>
-                                                    <div class="col-auto">
-
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="row mb-3">
-                                                    <div class="col-auto">
-                                                        <div class="rounded bg-theme-1 text-white p-3">
-                                                            <p class="opacity-75 small mb-1">
-                                                                Annual<br />Income
-                                                            </p>
-                                                            <h5>$124k</h5>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col align-self-center">
-                                                        <p class="text-secondary small mb-0">United States</p>
-                                                        <p>45<small>% Sales</small></p>
-
-                                                        <div class="mt-3">
-                                                            <div class="progress height-dynamic mb-1 bg-theme-1-subtle" style="--h-dynamic:5px">
-                                                                <div class="progress-bar bg-theme-1" role="progressbar" style="width: 45%" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100"></div>
-                                                            </div>
-                                                        </div>
-                                                        <p class="small text-secondary">Targeted orders <span class="float-end">153k</span></p>
-                                                    </div>
-                                                </div>
-                                                <div class="row mb-3">
-                                                    <div class="col-auto">
-                                                        <div class="rounded bg-theme-1-subtle p-3">
-                                                            <p class="opacity-75 small mb-1">Annual<br />Income</p>
-                                                            <h5>$124k</h5>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col align-self-center">
-                                                        <p class="text-secondary small mb-0">United Kingdom</p>
-                                                        <p>15<small>% Sales</small></p>
-
-                                                        <div class="mt-3">
-                                                            <div class="progress height-dynamic mb-1 bg-theme-1-subtle" style="--h-dynamic:5px">
-                                                                <div class="progress-bar bg-theme-1" role="progressbar" style="width: 45%" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100"></div>
-                                                            </div>
-                                                        </div>
-                                                        <p class="small text-secondary">Targeted orders <span class="float-end">53k</span></p>
-                                                    </div>
-                                                </div>
-                                                <div class="row gx-3 gx-lg-4">
-                                                    <div class="col col-md text-center">
-                                                        <i class="bi bi-box h5 avatar avatar-30 text-theme-1 theme-green mb-2"></i>
-                                                        <h4 class="mb-0">1265</h4>
-                                                        <p class="small text-secondary">In Stock</p>
-                                                    </div>
-                                                    <div class="col col-md text-center">
-                                                        <i class="bi bi-truck h5 avatar avatar-30 text-theme-1 mb-2"></i>
-                                                        <h4 class="mb-0">365</h4>
-                                                        <p class="small text-secondary">Delivered</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="card-footer justify-content-center text-center">
-                                                <a href="https://www.adminuiux.com/adminuiux/adminux/html/inventory-dashboard.html" class="btn btn-sm btn-link">Visit Inventory Dash <i class="bi bi-arrow-right vm"></i></a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-6 col-xxl-3 mb-4">
-                                        <!-- Network card -->
-                                        <div class="card adminuiux-card shadow-sm bg-l-gradient-light theme-red h-100">
-                                            <div class="card-header">
-                                                <div class="row gx-3 gx-lg-4 align-items-center">
-                                                    <div class="col">
-                                                        <h6>
-                                                            <i class="bi bi-hdd-rack h5 me-1 avatar avatar-40 bg-theme-1-subtle text-theme-1 rounded me-2"></i>
-                                                            Network
-                                                        </h6>
-                                                    </div>
-                                                    <div class="col-auto">
-
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="height-100 mb-2">
-                                                    <canvas id="smallchart2"></canvas>
-                                                </div>
-                                                <p class="mb-1">Server CPU <span class="text-secondary">#0514-R3D</span></p>
-                                                <p class="text-secondary">45% 3.2 MHz</p>
-                                                <div class="card adminuiux-card mt-3">
-                                                    <div class="card-body">
-                                                        <div class="row gx-3 align-items-center">
-                                                            <div class="col-auto">
-                                                                <div class="position-relative">
-                                                                    <div id="circleprogressred" class="avatar avatar-50"></div>
-                                                                    <div class="avatar avatar-30 h5 bg-theme-1-subtle text-theme-1 theme-red rounded-circle position-absolute start-50 top-50 translate-middle">
-                                                                        <i class="bi bi-bug"></i>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="col">
-                                                                <p class="text-secondary small mb-1">Ticket Created</p>
-                                                                <p>651<small> and 250 yesterday</small></p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="card-footer border-top py-0">
-                                                        <div class="row gx-3 ">
-                                                            <div class="col py-2">
-                                                                <p class="text-secondary small mb-1">Resolved</p>
-                                                                <p class="text-success">432</p>
-                                                            </div>
-                                                            <div class="col border-start py-2">
-                                                                <p class="text-secondary small mb-1">In Progress</p>
-                                                                <p class="text-theme-1 theme-yellow">50</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="card-footer justify-content-center text-center">
-                                                <a href="https://www.adminuiux.com/adminuiux/adminux/html/network-dashboard.html" class="btn btn-sm btn-link">Visit Network Dashboard <i class="bi bi-arrow-right vm"></i></a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-6 col-lg-6 col-xxl-3 mb-4">
-                                        <!-- Social card -->
-                                        <div class="card adminuiux-card shadow-sm bg-l-gradient-light theme-green h-100">
-                                            <div class="card-header">
-                                                <div class="row gx-3 gx-lg-4 align-items-center">
-                                                    <div class="col">
-                                                        <h6>
-                                                            <i class="bi bi-people h5 me-1 avatar avatar-40 bg-theme-1-subtle text-theme-1 rounded me-2"></i> Social
-                                                        </h6>
-                                                    </div>
-                                                    <div class="col-auto">
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="row gx-3 align-items-center mb-3">
-                                                    <div class="col-auto">
-                                                        <figure class="coverimg rounded width-100 height-80 mb-0">
-                                                            <img src="assets/img/modern-ai-image/user-5.jpg" alt="" class="mw-100" />
-                                                        </figure>
-                                                    </div>
-                                                    <div class="col">
-                                                        <p class="text-secondary small mb-0">Boosted Post</p>
-                                                        <h4>2,545,05</h4>
-                                                        <p class="text-secondary small">People Reached</p>
-                                                    </div>
-                                                </div>
-                                                <div class="row gx-3 gx-lg-4 align-items-center">
-                                                    <div class="col-12 mb-2">
-                                                        <p class="text-secondary small">Buy now or Share now! Do support </p>
-                                                    </div>
-                                                    <div class="col">
-                                                        <p class="small text-secondary mb-0">Likes</p>
-                                                        <h5 class="mb-0">65.15 k</h5>
-                                                    </div>
-                                                    <div class="col">
-                                                        <p class="small text-secondary mb-0">Retweet</p>
-                                                        <h5 class="mb-0">8.2 k</h5>
-                                                    </div>
-                                                    <div class="col">
-                                                        <p class="small text-secondary mb-0">Clicks</p>
-                                                        <h5 class="mb-0">52.01 k</h5>
                                                     </div>
                                                 </div>
 
-                                                <div class="card adminuiux-card mt-3 bg-theme-r-gradient text-white">
-                                                    <div class="card-body">
-                                                        <div class="row gx-3 align-items-center mb-2">
-                                                            <div class="col-auto">
-                                                                <figure class="avatar avatar-50 coverimg rounded">
-                                                                    <img src="assets/img/modern-ai-image/pet-4.jpg" alt="" />
-                                                                </figure>
-                                                            </div>
-                                                            <div class="col">
-                                                                <p>Learn about software and Framework. All...</p>
+        <div class="col-lg-4">
+            <div class="db-panel">
+                <div class="db-panel-head">
+                    <div>
+                        <h5><i class="bi bi-lightning-charge me-2 text-primary"></i>Quick Actions</h5>
+                        <small>Jump to common tasks</small>
                                                             </div>
                                                         </div>
-                                                        <div class="row gx-3 gx-lg-4 align-items-center">
-                                                            <div class="col-auto">
-                                                                <p class="mb-0">125</p>
-                                                                <p class="small">Reached</p>
-                                                            </div>
-                                                            <div class="col-auto">
-                                                                <p class="mb-0">35</p>
-                                                                <p class="small">Likes</p>
-                                                            </div>
-                                                            <div class="col text-end">
-                                                                <button class="btn btn-sm btn-light">Boost</button>
-                                                            </div>
+                <div class="quick-grid">
+                    <a href="{{ route('stockEntry') }}" class="quick-link">
+                        <div class="quick-link-icon"><i class="bi bi-box-arrow-in-down"></i></div>
+                        <span>Stock Entry</span>
+                        <small>Record incoming stock</small>
+                    </a>
+                    <a href="{{ route('pendingStock') }}" class="quick-link">
+                        <div class="quick-link-icon"><i class="bi bi-hourglass"></i></div>
+                        <span>Pending Stock</span>
+                        <small>Awaiting approval</small>
+                    </a>
+                    @if($canApproveStock)
+                        <a href="{{ route('stockApproval') }}" class="quick-link">
+                            <div class="quick-link-icon"><i class="bi bi-check2-square"></i></div>
+                            <span>Stock Approval</span>
+                            <small>Review submissions</small>
+                        </a>
+                    @endif
+                    <a href="{{ route('IssueItem') }}" class="quick-link">
+                        <div class="quick-link-icon"><i class="bi bi-box-arrow-right"></i></div>
+                        <span>Issue Items</span>
+                        <small>Issue from inventory</small>
+                    </a>
+                    <a href="{{ route('Item') }}" class="quick-link">
+                        <div class="quick-link-icon"><i class="bi bi-tags"></i></div>
+                        <span>Items</span>
+                        <small>Manage product catalog</small>
+                    </a>
+                    <a href="{{ route('reOrder') }}" class="quick-link">
+                        <div class="quick-link-icon"><i class="bi bi-sliders"></i></div>
+                        <span>Reorder Levels</span>
+                        <small>Set minimum stock</small>
+                    </a>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div class="card-footer justify-content-center text-center">
-                                                <a href="https://www.adminuiux.com/adminuiux/adminux/html/social-dashboard.html" class="btn btn-sm btn-link">Visit Social Dashboard <i class="bi bi-arrow-right vm"></i></a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div> --}}
-
-                               
                              
                             </div>
+
 @endsection
 
 @section('scripts')
-    
 @endsection

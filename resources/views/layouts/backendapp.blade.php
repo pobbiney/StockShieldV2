@@ -3,17 +3,37 @@
     $staff_query = DB::select('SELECT * FROM staff WHERE staff_id = :id', ['id' => auth()->user()->staff_id]);
 
     $userCat = auth()->user()->user_cat;
-    $links = DB::select('SELECT user_links.link_id, user_links.page_id,user_links.page_id_sub, user_links.link_url, user_links.link_name, user_links.link_image, user_links.link_parent FROM user_cat_links INNER JOIN user_links ON user_cat_links.link_id = user_links.link_id WHERE user_cat_links.cat_id = :id ORDER BY user_links.link_name ASC',['id' => $userCat]);
+    $userId = auth()->id();
+    $storeContext = app(\App\Services\StoreContext::class);
+    $activeStore = $storeContext->getActiveStore();
+    $isGlobalStoreAccess = $storeContext->hasGlobalStoreAccess();
+    $mappedStoreCount = count($storeContext->getMappedStoreIds(auth()->user()));
+    $links = DB::select(
+        'SELECT DISTINCT user_links.link_id, user_links.page_id, user_links.page_id_sub, user_links.link_url, user_links.link_name, user_links.link_image, user_links.link_parent
+         FROM user_links
+         WHERE user_links.link_id IN (
+             SELECT link_id FROM user_cat_links WHERE cat_id = ?
+             UNION
+             SELECT link_id FROM user_extra_links WHERE user_id = ?
+         )
+         ORDER BY user_links.link_name ASC',
+        [$userCat, $userId]
+    );
     $parents = array();
     $child = array();
+    $childrenByParent = [];
     foreach ($links as $row_links) {
         if ($row_links->link_parent == 0) {
             $parents[] = $row_links;
         } else {
             $child[] = $row_links;
+            $childrenByParent[$row_links->link_parent][] = $row_links;
         }
     }
 
+    $currentPage = $pageName ?? '';
+    $currentSubpage = $subpageName ?? '';
+    $sidebarUserInitials = strtoupper(collect(explode(' ', auth()->user()->name))->filter()->take(2)->map(fn ($w) => $w[0])->join(''));
     
 @endphp
 <!DOCTYPE html>
@@ -25,6 +45,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>StockShield</title>
     <link rel="icon" type="image/png" href="{{asset('backend/assets/img/favicon.png')}}">
@@ -56,6 +77,785 @@
             --adminuiux-content-font-weight: 400;
             --adminuiux-title-font: "SUSE", sans-serif;
             --adminuiux-title-font-weight: 600;
+        }
+
+        .compact-swal-popup,
+        .staff-swal-popup {
+            font-size: 16px !important;
+            border-radius: 1rem !important;
+            padding: 1.5rem 1.75rem 1.35rem !important;
+            width: 28rem !important;
+            max-width: 92vw !important;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.14) !important;
+        }
+
+        .compact-swal-popup .swal2-icon,
+        .staff-swal-popup .swal2-icon {
+            width: 5em !important;
+            height: 5em !important;
+            margin: 0.5em auto 1em !important;
+            border-width: 0.25em !important;
+            line-height: 5em !important;
+            overflow: visible !important;
+        }
+
+        .compact-swal-popup .swal2-icon .swal2-icon-content,
+        .staff-swal-popup .swal2-icon .swal2-icon-content {
+            font-size: 3.75em !important;
+        }
+
+        .compact-swal-title,
+        .staff-swal-title {
+            font-family: "SUSE", sans-serif !important;
+            font-weight: 700 !important;
+            font-size: 1.2rem !important;
+            color: #0f172a !important;
+            padding: 0 !important;
+        }
+
+        .compact-swal-text,
+        .staff-swal-text {
+            font-size: 0.9rem !important;
+            color: #64748b !important;
+            line-height: 1.55 !important;
+            margin-top: 0.5rem !important;
+        }
+
+        .compact-swal-popup .swal2-actions,
+        .staff-swal-popup .swal2-actions {
+            margin: 1rem 0 0 !important;
+            gap: 0.6rem !important;
+        }
+
+        .compact-swal-confirm,
+        .staff-swal-confirm {
+            border-radius: 0.5rem !important;
+            padding: 0.5rem 1.15rem !important;
+            font-size: 0.875rem !important;
+            font-weight: 600 !important;
+            color: #fff !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        .compact-swal-confirm.success,
+        .staff-swal-confirm.success { background: #16a34a !important; }
+
+        .compact-swal-confirm.error,
+        .staff-swal-confirm.error { background: #dc3545 !important; }
+
+        .staff-swal-confirm.info { background: #0d6efd !important; }
+        .staff-swal-confirm.neutral { background: #64748b !important; }
+
+        .staff-swal-cancel {
+            border-radius: 0.5rem !important;
+            padding: 0.5rem 1rem !important;
+            font-weight: 500 !important;
+            font-size: 0.875rem !important;
+        }
+
+        /* ── Breadcrumb (ss-bc) ── */
+        .ss-bc {
+            display: inline-flex;
+            max-width: 100%;
+            margin-bottom: 0.75rem;
+        }
+
+        .ss-bc__list {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.15rem;
+            list-style: none;
+            margin: 0;
+            padding: 0.4rem 0.55rem;
+            border-radius: 0.875rem;
+        }
+
+        .ss-bc--light .ss-bc__list {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.05);
+        }
+
+        .ss-bc--dark .ss-bc__list {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+        }
+
+        .ss-bc__item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .ss-bc__sep {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            color: #cbd5e1;
+            flex-shrink: 0;
+            list-style: none;
+        }
+
+        .ss-bc__sep svg {
+            width: 11px;
+            height: 11px;
+            opacity: 0.85;
+        }
+
+        .ss-bc--dark .ss-bc__sep {
+            color: rgba(255, 255, 255, 0.45);
+        }
+
+        .ss-bc__link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.32rem 0.65rem;
+            border-radius: 0.5rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: background 0.18s ease, color 0.18s ease, transform 0.15s ease;
+        }
+
+        .ss-bc--light .ss-bc__link {
+            color: #64748b;
+        }
+
+        .ss-bc--light .ss-bc__link:hover {
+            background: #f1f5f9;
+            color: #4f46e5;
+        }
+
+        .ss-bc--dark .ss-bc__link {
+            color: rgba(255, 255, 255, 0.82);
+        }
+
+        .ss-bc--dark .ss-bc__link:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+        }
+
+        .ss-bc__icon {
+            width: 22px;
+            height: 22px;
+            border-radius: 0.4rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.72rem;
+            flex-shrink: 0;
+        }
+
+        .ss-bc--light .ss-bc__icon {
+            background: rgba(79, 70, 229, 0.1);
+            color: #4f46e5;
+        }
+
+        .ss-bc--dark .ss-bc__icon {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+        }
+
+        .ss-bc__item.is-current {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.32rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+        }
+
+        .ss-bc--light .ss-bc__item.is-current {
+            color: #fff;
+            background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+            box-shadow: 0 2px 10px rgba(79, 70, 229, 0.35);
+        }
+
+        .ss-bc--light .ss-bc__item.is-current .ss-bc__icon {
+            background: rgba(255, 255, 255, 0.22);
+            color: #fff;
+        }
+
+        .ss-bc--dark .ss-bc__item.is-current {
+            color: #312e81;
+            background: #fff;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .ss-bc--dark .ss-bc__item.is-current .ss-bc__icon {
+            background: rgba(79, 70, 229, 0.12);
+            color: #4f46e5;
+        }
+
+        .ss-bc__label {
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+
+        /* Legacy bootstrap breadcrumbs → match ss-bc look */
+        .adminuiux-content nav[aria-label="breadcrumb"]:not(.ss-bc) {
+            display: inline-flex;
+            max-width: 100%;
+            margin-bottom: 0.65rem;
+        }
+
+        .adminuiux-content nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.15rem;
+            margin: 0;
+            padding: 0.4rem 0.55rem;
+            border-radius: 0.875rem;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.05);
+            list-style: none;
+        }
+
+        .adminuiux-content nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb-item {
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .adminuiux-content nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb-item + .breadcrumb-item::before {
+            content: none !important;
+            display: none !important;
+        }
+
+        .adminuiux-content nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb-item:not(:first-child)::before {
+            content: '';
+            display: inline-block;
+            width: 11px;
+            height: 11px;
+            margin: 0 0.35rem;
+            flex-shrink: 0;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' fill='%23cbd5e1' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+            background-size: contain;
+            background-repeat: no-repeat;
+            float: none !important;
+            padding: 0 !important;
+        }
+
+        .adminuiux-content nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb-item a {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.32rem 0.65rem;
+            border-radius: 0.5rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: #64748b;
+            text-decoration: none;
+            transition: background 0.18s, color 0.18s;
+        }
+
+        .adminuiux-content nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb-item a:hover {
+            background: #f1f5f9;
+            color: #4f46e5;
+        }
+
+        .adminuiux-content nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb-item.active {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.32rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: #fff;
+            background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+            box-shadow: 0 2px 10px rgba(79, 70, 229, 0.35);
+        }
+
+        [class*="-hero"] nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb,
+        .submenu-hero nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+        }
+
+        [class*="-hero"] nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb-item:not(:first-child)::before,
+        .submenu-hero nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb-item:not(:first-child)::before {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' fill='%23ffffff' fill-opacity='0.45' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+        }
+
+        [class*="-hero"] nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb-item a,
+        .submenu-hero nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb-item a {
+            color: rgba(255, 255, 255, 0.82);
+        }
+
+        [class*="-hero"] nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb-item a:hover,
+        .submenu-hero nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb-item a:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+        }
+
+        [class*="-hero"] nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb-item.active,
+        .submenu-hero nav[aria-label="breadcrumb"]:not(.ss-bc) .breadcrumb-item.active {
+            color: #312e81;
+            background: #fff;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .bg-theme-1-subtle:has(nav[aria-label="breadcrumb"]) {
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04) !important;
+            border-radius: 0.875rem !important;
+        }
+
+        .page-title .ss-bc {
+            margin-bottom: 0.85rem;
+        }
+
+        [class*="-hero"] .ss-bc,
+        .submenu-hero .ss-bc {
+            margin-bottom: 0.65rem;
+        }
+
+        [class*="-hero"] .ss-bc--light .ss-bc__list,
+        .submenu-hero .ss-bc--light .ss-bc__list {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        /* ── StockShield sidebar redesign ── */
+        .ss-sidebar {
+            border-right: 1px solid rgba(15, 23, 42, 0.06) !important;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+        }
+
+        .ss-sidebar-inner {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding-bottom: 1rem;
+        }
+
+        .ss-sidebar-user {
+            margin: 0.85rem 0.85rem 0.5rem;
+            padding: 1rem;
+            border-radius: 1rem;
+            background: linear-gradient(135deg, #312e81 0%, #4f46e5 55%, #6366f1 100%);
+            color: #fff;
+            box-shadow: 0 8px 24px rgba(79, 70, 229, 0.28);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ss-sidebar-user::before {
+            content: '';
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+            top: -30px;
+            right: -20px;
+        }
+
+        .ss-sidebar-user-inner {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .ss-sidebar-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            overflow: hidden;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+
+        .ss-sidebar-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .ss-sidebar-user-name {
+            font-family: "SUSE", sans-serif;
+            font-weight: 700;
+            font-size: 0.875rem;
+            line-height: 1.25;
+            margin-bottom: 0.15rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 160px;
+        }
+
+        .ss-sidebar-user-role {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.68rem;
+            font-weight: 600;
+            padding: 0.15rem 0.5rem;
+            border-radius: 2rem;
+            background: rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+        }
+
+        .ss-sidebar-store {
+            margin: 0 0.85rem 0.75rem;
+            padding: 0.55rem 0.75rem;
+            border-radius: 0.625rem;
+            background: rgba(79, 70, 229, 0.08);
+            border: 1px solid rgba(79, 70, 229, 0.12);
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #4f46e5;
+        }
+
+        .ss-sidebar-store i { font-size: 0.85rem; }
+
+        .ss-sidebar-section {
+            padding: 0.65rem 1.1rem 0.35rem;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #94a3b8;
+        }
+
+        .ss-sidebar-nav {
+            list-style: none;
+            margin: 0;
+            padding: 0 0.65rem;
+            flex: 1;
+        }
+
+        .ss-nav-item { margin-bottom: 0.2rem; }
+
+        .ss-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.65rem 0.85rem;
+            border-radius: 0.75rem;
+            text-decoration: none;
+            color: #475569;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: background 0.2s, color 0.2s, transform 0.15s, box-shadow 0.2s;
+            position: relative;
+        }
+
+        .ss-nav-link:hover {
+            background: rgba(79, 70, 229, 0.08);
+            color: #4f46e5;
+        }
+
+        .ss-nav-item.is-active .ss-nav-link {
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.14) 0%, rgba(99, 102, 241, 0.1) 100%);
+            color: #4f46e5;
+            font-weight: 600;
+            box-shadow: inset 3px 0 0 #4f46e5;
+        }
+
+        .ss-nav-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 0.625rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            background: rgba(100, 116, 139, 0.1);
+            color: #64748b;
+            font-size: 1rem;
+            transition: background 0.2s, color 0.2s, transform 0.2s;
+        }
+
+        .ss-nav-link:hover .ss-nav-icon,
+        .ss-nav-item.is-active .ss-nav-icon {
+            background: rgba(79, 70, 229, 0.15);
+            color: #4f46e5;
+        }
+
+        .ss-nav-item.is-active .ss-nav-icon {
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+        }
+
+        .ss-nav-text {
+            flex: 1;
+            line-height: 1.3;
+            min-width: 0;
+        }
+
+        .ss-nav-badge {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.15rem 0.45rem;
+            border-radius: 2rem;
+            background: rgba(79, 70, 229, 0.1);
+            color: #4f46e5;
+            flex-shrink: 0;
+        }
+
+        .ss-nav-item.is-active .ss-nav-badge {
+            background: rgba(79, 70, 229, 0.2);
+        }
+
+        .ss-nav-chevron {
+            font-size: 0.7rem;
+            color: #cbd5e1;
+            transition: transform 0.2s, color 0.2s;
+        }
+
+        .ss-nav-link:hover .ss-nav-chevron { color: #4f46e5; }
+
+        .ss-sidebar-footer {
+            margin: 0.75rem 0.85rem 0;
+            padding-top: 0.75rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .ss-sidebar-footer-link {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.6rem 0.85rem;
+            border-radius: 0.75rem;
+            text-decoration: none;
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: #64748b;
+            transition: background 0.2s, color 0.2s;
+            border: none;
+            background: transparent;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .ss-sidebar-footer-link:hover {
+            background: rgba(239, 68, 68, 0.08);
+            color: #dc2626;
+        }
+
+        .ss-sidebar-footer-link i {
+            width: 32px;
+            height: 32px;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(100, 116, 139, 0.1);
+            font-size: 0.9rem;
+        }
+
+        .ss-sidebar-footer-link:hover i {
+            background: rgba(239, 68, 68, 0.12);
+        }
+
+        /* Iconic / collapsed sidebar */
+        .adminuiux-sidebar-iconic .ss-nav-text,
+        .adminuiux-sidebar-iconic .ss-nav-badge,
+        .adminuiux-sidebar-iconic .ss-nav-chevron,
+        .adminuiux-sidebar-iconic .ss-sidebar-section,
+        .adminuiux-sidebar-iconic .ss-sidebar-user-info,
+        .adminuiux-sidebar-iconic .ss-sidebar-store span,
+        .adminuiux-sidebar-iconic .ss-sidebar-footer-link span {
+            display: none !important;
+        }
+
+        .adminuiux-sidebar-iconic .ss-sidebar-user {
+            padding: 0.65rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .adminuiux-sidebar-iconic .ss-sidebar-user-inner {
+            justify-content: center;
+        }
+
+        .adminuiux-sidebar-iconic .ss-nav-link {
+            justify-content: center;
+            padding: 0.65rem;
+        }
+
+        .adminuiux-sidebar-iconic .ss-sidebar-nav {
+            padding: 0 0.35rem;
+        }
+
+        /* WhatsApp-style in-app toast notifications */
+        .ss-toast-stack {
+            position: fixed;
+            right: 1.25rem;
+            bottom: 1.25rem;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            max-width: min(380px, calc(100vw - 2rem));
+            pointer-events: none;
+        }
+
+        .ss-toast {
+            pointer-events: auto;
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
+            background: #fff;
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            cursor: pointer;
+            animation: ssToastIn 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .ss-toast-exit {
+            animation: ssToastOut 0.25s ease forwards;
+        }
+
+        @keyframes ssToastIn {
+            from { opacity: 0; transform: translateX(110%) scale(0.95); }
+            to   { opacity: 1; transform: translateX(0) scale(1); }
+        }
+
+        @keyframes ssToastOut {
+            from { opacity: 1; transform: translateX(0); }
+            to   { opacity: 0; transform: translateX(110%); }
+        }
+
+        .ss-toast-accent {
+            width: 4px;
+            flex-shrink: 0;
+            background: linear-gradient(180deg, #25d366, #128c7e);
+        }
+
+        .ss-toast-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: #075e54;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 0.65rem;
+            margin-left: 0.15rem;
+            overflow: hidden;
+        }
+
+        .ss-toast-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .ss-toast-body {
+            flex: 1;
+            min-width: 0;
+            padding: 0.65rem 0.85rem 0.75rem 0;
+        }
+
+        .ss-toast-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 0.2rem;
+        }
+
+        .ss-toast-app {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #075e54;
+        }
+
+        .ss-toast-time {
+            font-size: 0.7rem;
+            color: #8696a0;
+            white-space: nowrap;
+        }
+
+        .ss-toast-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #111b21;
+            margin-bottom: 0.15rem;
+        }
+
+        .ss-toast-message {
+            font-size: 0.82rem;
+            color: #54656f;
+            line-height: 1.35;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .ss-toast-close {
+            border: none;
+            background: transparent;
+            color: #8696a0;
+            font-size: 1.1rem;
+            line-height: 1;
+            padding: 0.35rem 0.5rem;
+            margin: 0.25rem 0.25rem 0 0;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .ss-toast-close:hover { color: #111b21; }
+
+        .ss-toast-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 0.45rem;
+        }
+
+        .ss-toast-open {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.28rem 0.75rem;
+            border-radius: 2rem;
+            background: #25d366;
+            color: #fff !important;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-decoration: none;
+            border: none;
+        }
+
+        .ss-toast-open:hover {
+            background: #1da851;
+            color: #fff !important;
+        }
+
+        .ss-toast-persistent {
+            border-left: 3px solid #25d366;
         }
     </style>
 
@@ -111,6 +911,18 @@
 
             <!-- right icons button -->
             <div class="ms-auto">
+                @if(!$isGlobalStoreAccess && $activeStore)
+                    <span class="badge bg-theme-1-subtle text-theme-1 border me-2 d-none d-md-inline-flex align-items-center gap-1 px-3 py-2">
+                        <i class="bi bi-shop"></i> {{ $activeStore->name }}
+                    </span>
+                @endif
+
+                @if(!$isGlobalStoreAccess && $mappedStoreCount > 1)
+                    <a href="{{ route('switch-store') }}" class="btn btn-link btn-square btn-link-header" title="Switch Store">
+                        <i class="bi bi-arrow-left-right"></i>
+                    </a>
+                @endif
+
                 <!-- global search toggle -->
                 <button class="btn btn-link btn-square btn-icon btn-link-header d-lg-none" type="button" onclick="openSearch()">
                     <i data-feather="search"></i>
@@ -126,12 +938,17 @@
               
 
                 <!-- notification dropdown -->
-                <button class="btn btn-link btn-square btn-icon btn-link-header dropdown-toggle position-relative no-caret" type="button" data-bs-toggle="offcanvas" data-bs-target="#view-notification" aria-expanded="false">
+                <button class="btn btn-link btn-square btn-icon btn-link-header dropdown-toggle position-relative no-caret" type="button" data-bs-toggle="offcanvas" data-bs-target="#view-notification" aria-expanded="false" id="notificationBellBtn">
                     <i data-feather="bell"></i>
-                    <span class="position-absolute top-0 end-0 badge rounded-pill bg-danger p-1">
-                        <small>{{ $reorderItemsCount}} +</small>
-                        <span class="visually-hidden">unread messages</span>
+                    <span class="position-absolute top-0 end-0 badge rounded-pill bg-danger p-1 d-none" id="notif-badge">
+                        <small id="notif-badge-count">0</small>
+                        <span class="visually-hidden">unread action notifications</span>
                     </span>
+                    @if(($reorderItemsCount ?? 0) > 0)
+                    <span class="position-absolute top-0 start-0 badge rounded-pill bg-warning p-1" style="transform: translate(-30%, -20%);">
+                        <small>{{ $reorderItemsCount }}</small>
+                    </span>
+                    @endif
                 </button>
 
                 <!-- profile dropdown -->
@@ -215,69 +1032,95 @@
                 <div class="adminuiux-wrap">
 
                     <!-- Standard sidebar -->
-                    <!-- Standard sidebar -->
-<div class="adminuiux-sidebar shadow-sm">
-    <div class="adminuiux-sidebar-inner">
-        <div class="px-3 not-iconic mt-2">
-            <div class="row gx-3 gx-lg-4">
-                <div class="col align-self-center menu-name">
-                    <h6>Main navigation</h6>
-                </div>
-                <div class="col-auto">
-                    <a class="collapsed btn btn-link btn-square" data-bs-toggle="collapse" data-bs-target="#usersidebarprofile" aria-expanded="false" role="button" aria-controls="usersidebarprofile">
-                        <i class="bi bi-person-circle"></i>
-                    </a>
-                </div>
-            </div>
-        </div>
+<div class="adminuiux-sidebar ss-sidebar shadow-sm">
+    <div class="adminuiux-sidebar-inner ss-sidebar-inner">
 
-        <!-- user information -->
-        <div class="px-3 text-center not-iconic collapse" id="usersidebarprofile">
-            <div class="avatar avatar-100 rounded-circle shadow-sm my-3 bg-white">
-                <figure class="avatar avatar-90 rounded-circle coverimg">
-                    @if(Auth::user()->staff)
-                    <img src="{{ asset(Auth::user()->staff->picture) }}" alt="" id="userphotoonboarding" style="display: none;">
+        {{-- User card --}}
+        <div class="ss-sidebar-user not-iconic">
+            <div class="ss-sidebar-user-inner">
+                <div class="ss-sidebar-avatar">
+                    @if(Auth::user()->staff && Auth::user()->staff->picture)
+                        <img src="{{ asset(Auth::user()->staff->picture) }}" alt="">
+                    @else
+                        {{ $sidebarUserInitials }}
                     @endif
-                </figure>
+                </div>
+                <div class="ss-sidebar-user-info">
+                    <div class="ss-sidebar-user-name" title="{{ auth()->user()->name }}">{{ auth()->user()->name }}</div>
+                    <span class="ss-sidebar-user-role">
+                        <i class="bi bi-shield-check"></i>
+                        {{ auth()->user()->getUserCategory() }}
+                    </span>
+                </div>
             </div>
-            <h5 class="mb-0" id="usernamedisplay">{{auth()->user()->name}}</h5>
-            <p class="text-secondary small mb-3">{{auth()->user()->getUserCategory()}}</p>
         </div>
 
-        <!-- user menu navigation -->
-        <ul class="nav flex-column menu-active-line">
-            <li class="nav-item">
-                <a class="nav-link" aria-current="page" href="{{route('dashboard')}}">
-                    <i class="menu-icon bi bi-speedometer2"></i>
-                     <div class="col menu-name @if ($pageName == "dashboard") active  @endif">Dashboard</div>
+        {{-- Active store --}}
+        @if(!$isGlobalStoreAccess && $activeStore)
+            <div class="ss-sidebar-store not-iconic">
+                <i class="bi bi-shop"></i>
+                <span>{{ $activeStore->name }}</span>
+            </div>
+        @elseif($isGlobalStoreAccess)
+            <div class="ss-sidebar-store not-iconic">
+                <i class="bi bi-globe2"></i>
+                <span>All stores</span>
+            </div>
+        @endif
+
+        <div class="ss-sidebar-section not-iconic">Main Menu</div>
+
+        <ul class="ss-sidebar-nav nav flex-column menu-active-line">
+            <li class="ss-nav-item {{ $currentPage === 'dashboard' ? 'is-active' : '' }}">
+                <a class="ss-nav-link" href="{{ route('dashboard') }}">
+                    <span class="ss-nav-icon"><i class="bi bi-speedometer2"></i></span>
+                    <span class="ss-nav-text">Dashboard</span>
                 </a>
             </li>
+
             @foreach ($parents as $parent)
-            <li class="nav-item  " class="@if ($pageName == $parent->page_id) active  @endif">
-                <a href="{{ route('submenu', Crypt::encrypt($parent->link_id)) }}" class="nav-link  ">
-                    <i class="{{$parent->link_image}}"></i>
-                    <div class="col menu-name">{{$parent->link_name}}</div>
-                </a> 
-                {{-- <ul class="dropdown-menu">
-                    @foreach ($child as $sub)
-									   @if ($parent->link_id == $sub->link_parent)
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{route($sub->link_url)}}">
-                            <i class="menu-icon bi bi-plus"></i>
-                            <div class="@if ($subpageName == $sub->page_id_sub) active @endif">{{ $sub->link_name}}</div>
-                        </a>
-                    </li>
-                    @endif
-				    @endforeach
-                  
-                </ul> --}}
-            </li>
-             @endforeach
+                @php
+                    $iconClass = trim(preg_replace('/\bmenu-icon\b/', '', $parent->link_image ?? 'bi bi-circle'));
+                    $iconClass = $iconClass !== '' ? $iconClass : 'bi bi-circle';
+                    $childCount = count($childrenByParent[$parent->link_id] ?? []);
+                    $isParentActive = $currentPage === $parent->page_id;
+                    if ($currentPage === 'submenu' && request()->routeIs('submenu')) {
+                        try {
+                            $activeSubmenuId = Crypt::decrypt((string) request()->route('id'));
+                            $isParentActive = (int) $activeSubmenuId === (int) $parent->link_id;
+                        } catch (\Throwable $e) {
+                            $isParentActive = false;
+                        }
+                    }
+                @endphp
+                <li class="ss-nav-item {{ $isParentActive ? 'is-active' : '' }}">
+                    <a href="{{ route('submenu', Crypt::encrypt($parent->link_id)) }}" class="ss-nav-link">
+                        <span class="ss-nav-icon"><i class="{{ $iconClass }}"></i></span>
+                        <span class="ss-nav-text">{{ $parent->link_name }}</span>
+                        @if($childCount > 0)
+                            <span class="ss-nav-badge not-iconic">{{ $childCount }}</span>
+                            <i class="bi bi-chevron-right ss-nav-chevron not-iconic"></i>
+                        @endif
+                    </a>
+                </li>
+            @endforeach
         </ul>
 
-        <!-- applications -->
-        
-       
+        <div class="ss-sidebar-footer not-iconic">
+            @if(!$isGlobalStoreAccess && $mappedStoreCount > 1)
+                <a href="{{ route('switch-store') }}" class="ss-sidebar-footer-link mb-1">
+                    <i class="bi bi-arrow-left-right"></i>
+                    <span>Switch Store</span>
+                </a>
+            @endif
+            <form action="{{ route('logout-authentication-process') }}" method="POST" class="m-0">
+                @csrf
+                <button type="submit" class="ss-sidebar-footer-link">
+                    <i class="bi bi-box-arrow-left"></i>
+                    <span>Logout</span>
+                </button>
+            </form>
+        </div>
 
     </div>
 </div>
@@ -287,25 +1130,39 @@
                         </main>
                 </div>
 
+                <div id="ss-toast-stack" class="ss-toast-stack" aria-live="polite" aria-atomic="false"></div>
+
                 <!-- notification -->
                 <div class="offcanvas offcanvas-end shadow border-0 maxwidth-300" tabindex="-1" id="view-notification" data-bs-scroll="true" data-bs-backdrop="false">
     <div class="offcanvas-header border-bottom">
         <div class="flex-grow-1">
             <h6 class="mb-0">Notifications</h6>
-            <p class="text-secondary">{{ $reorderItemsCount }} new updates</p>
+            <p class="text-secondary mb-0"><span id="action-notif-summary">Loading...</span></p>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
-    {{-- <div class="small text-center px-3 py-2 bg-theme-1-subtle text-theme-1 border-bottom">
-        <div class="input-group">
-            <input type="text" class="form-control daterangepickers">
-            <span class="input-group-text text-secondary">
-                <i class="bi bi-calendar-week"></i>
-            </span>
+    <div class="offcanvas-body p-0">
+        <div id="desktop-notif-permission" class="px-3 py-2 bg-theme-1-subtle border-bottom d-none">
+            <p class="small mb-2">Enable desktop alerts to get prompted when action is required.</p>
+            <button type="button" class="btn btn-sm btn-theme" id="enableDesktopNotifBtn">
+                <i class="bi bi-bell"></i> Enable Desktop Alerts
+            </button>
         </div>
-    </div> --}}
-    <div class="offcanvas-body">
-         
+
+        <div class="px-3 py-2 border-bottom d-flex align-items-center justify-content-between">
+            <strong class="small text-uppercase text-secondary">Action Required</strong>
+            <button type="button" class="btn btn-link btn-sm p-0" id="markAllNotifReadBtn">Mark all read</button>
+        </div>
+        <div id="action-notifications-list" class="px-2 py-2">
+            <p class="text-secondary small px-2 py-3 mb-0">Loading notifications...</p>
+        </div>
+
+        @if(($reorderItemsCount ?? 0) > 0)
+        <div class="px-3 py-2 border-top border-bottom">
+            <strong class="small text-uppercase text-secondary">Stock Alerts</strong>
+        </div>
+        @endif
+        <div class="px-2 py-2">
         @foreach($reorderItems as $item)
 
         @if($item->total_qty  == $item->reorder_level)
@@ -356,6 +1213,7 @@
        @endif
 
       @endforeach
+        </div>
     </div>
 </div>
 
@@ -653,26 +1511,48 @@ $(document).ready(function () {
 });
 </script>
 
+@unless(View::hasSection('page-alerts'))
 <script>
     @if(session('message_success'))
 Swal.fire({
     icon: 'success',
     title: 'Success',
-    text: "{{ session('message_success') }}",
+    text: @json(session('message_success')),
+    width: '28rem',
+    padding: '1.5rem 1.75rem 1.35rem',
+    buttonsStyling: false,
+    customClass: {
+        popup: 'compact-swal-popup',
+        title: 'compact-swal-title',
+        htmlContainer: 'compact-swal-text',
+        confirmButton: 'btn compact-swal-confirm success',
+    },
     showConfirmButton: true,
-    timer: 5000
+    timer: 3500,
+    timerProgressBar: true,
 });
 @endif
 @if(session('message_error'))
 Swal.fire({
     icon: 'error',
     title: 'Error',
-    text: "{{ session('message_error') }}",
-     showConfirmButton: true,
-    timer: 5000
+    text: @json(session('message_error')),
+    width: '28rem',
+    padding: '1.5rem 1.75rem 1.35rem',
+    buttonsStyling: false,
+    customClass: {
+        popup: 'compact-swal-popup',
+        title: 'compact-swal-title',
+        htmlContainer: 'compact-swal-text',
+        confirmButton: 'btn compact-swal-confirm error',
+    },
+    showConfirmButton: true,
+    timer: 4500,
+    timerProgressBar: true,
 });
 @endif
 </script>
+@endunless
  <script>
         $(document).ready(function () {
 
@@ -716,50 +1596,381 @@ Swal.fire({
 
 <script>
 
-  // Ask for notification permission once, if not already granted/denied
-if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
-    Notification.requestPermission();
-}
+(function () {
+    const userId = {{ auth()->id() ?? 0 }};
+    const storageKey = 'lastSeenNotificationId_' + userId;
+    let lastSeenId = parseInt(localStorage.getItem(storageKey) || '0', 10);
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    const notifIconUrl = "{{ asset('backend/assets/img/favicon.png') }}";
+    const approveRequestUrl = @json(route('ApproveRequest'));
+    let audioContext = null;
+    const dismissedToastKey = 'dismissedToastIds_' + userId;
+    const dismissedToastIds = new Set(
+        JSON.parse(sessionStorage.getItem(dismissedToastKey) || '[]')
+    );
 
-let lastSeenId = localStorage.getItem('lastSeenNotificationId') || 0;
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text || '';
+        return div.innerHTML;
+    }
 
-function checkForNewRequests() {
-    $.ajax({
-        url: "{{ route('check-notifications') }}",
-        type: "GET",
-        data: { last_id: lastSeenId },
-        success: function (response) {
-            if (response.count > 0) {
+    function resolveActionUrl(note) {
+        if (!note) {
+            return '#';
+        }
 
-                response.notifications.forEach(function (note) {
-                    showDesktopNotification(note.title, note.message);
-                });
+        if (note.action_route === 'ApproveRequest' || note.type === 'requisition_submitted') {
+            return approveRequestUrl;
+        }
 
-                updateNotificationBadge(response.count);
+        if (note.action_url && note.action_url !== '#') {
+            return note.action_url;
+        }
+
+        return '#';
+    }
+
+    function playNotificationSound() {
+        try {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
 
-            lastSeenId = response.latest_id;
-            localStorage.setItem('lastSeenNotificationId', lastSeenId);
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+
+            const now = audioContext.currentTime;
+
+            function tone(freq, start, duration, volume) {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.0001, now + start);
+                gain.gain.exponentialRampToValueAtTime(volume, now + start + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + start + duration);
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.start(now + start);
+                osc.stop(now + start + duration + 0.05);
+            }
+
+            tone(880, 0, 0.11, 0.22);
+            tone(1174, 0.13, 0.16, 0.18);
+            tone(880, 0.32, 0.12, 0.14);
+        } catch (e) {
+            // Ignore if audio is blocked by the browser.
+        }
+    }
+
+    function persistDismissedToasts() {
+        sessionStorage.setItem(dismissedToastKey, JSON.stringify(Array.from(dismissedToastIds)));
+    }
+
+    function dismissToast(toast, rememberDismissal) {
+        if (!toast || toast.classList.contains('ss-toast-exit')) {
+            return;
+        }
+
+        if (rememberDismissal && toast.dataset.notifId) {
+            dismissedToastIds.add(toast.dataset.notifId);
+            persistDismissedToasts();
+        }
+
+        toast.classList.add('ss-toast-exit');
+        setTimeout(function () { toast.remove(); }, 260);
+    }
+
+    function removeToastById(id) {
+        const toast = document.querySelector('.ss-toast[data-notif-id="' + id + '"]');
+        dismissToast(toast, false);
+    }
+
+    function showPersistentToast(note, playSound) {
+        const stack = document.getElementById('ss-toast-stack');
+        if (!stack || !note || !note.is_unread) {
+            return false;
+        }
+
+        const notifId = String(note.id);
+        if (document.querySelector('.ss-toast[data-notif-id="' + notifId + '"]')) {
+            return false;
+        }
+
+        if (dismissedToastIds.has(notifId)) {
+            return false;
+        }
+
+        const actionUrl = resolveActionUrl(note);
+        const toast = document.createElement('div');
+        toast.className = 'ss-toast ss-toast-persistent';
+        toast.dataset.notifId = notifId;
+        toast.dataset.tag = 'ss-action-' + notifId;
+        toast.innerHTML = `
+            <div class="ss-toast-accent"></div>
+            <div class="ss-toast-icon">
+                <img src="${notifIconUrl}" alt="">
+            </div>
+            <div class="ss-toast-body">
+                <div class="ss-toast-head">
+                    <span class="ss-toast-app">Stock Shield</span>
+                    <span class="ss-toast-time">now</span>
+                </div>
+                <div class="ss-toast-title">${escapeHtml(note.title)}</div>
+                <div class="ss-toast-message">${escapeHtml(note.message)}</div>
+                <div class="ss-toast-actions">
+                    <a href="${actionUrl}" class="ss-toast-open">Open</a>
+                </div>
+            </div>
+            <button type="button" class="ss-toast-close" aria-label="Close notification">&times;</button>
+        `;
+
+        toast.querySelector('.ss-toast-close').addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dismissToast(toast, true);
+        });
+
+        stack.prepend(toast);
+
+        if (playSound) {
+            playNotificationSound();
+        }
+
+        return true;
+    }
+
+    function syncUnreadToasts(notifications) {
+        const unread = (notifications || []).filter(function (note) {
+            return note.is_unread;
+        });
+        const unreadIds = new Set(unread.map(function (note) {
+            return String(note.id);
+        }));
+
+        document.querySelectorAll('.ss-toast[data-notif-id]').forEach(function (toast) {
+            if (!unreadIds.has(toast.dataset.notifId)) {
+                dismissToast(toast, false);
+            }
+        });
+
+        dismissedToastIds.forEach(function (id) {
+            if (!unreadIds.has(id)) {
+                dismissedToastIds.delete(id);
+            }
+        });
+        persistDismissedToasts();
+
+        unread.forEach(function (note) {
+            showPersistentToast(note, false);
+        });
+    }
+
+    function showNativeNotification(note) {
+        if (!('Notification' in window)) {
+            return;
+        }
+
+        if (Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+
+        if (Notification.permission !== 'granted') {
+            return;
+        }
+
+        const actionUrl = resolveActionUrl(note);
+        const notification = new Notification(note.title, {
+            body: note.message,
+            icon: notifIconUrl,
+            badge: notifIconUrl,
+            tag: 'ss-action-' + note.id,
+            renotify: true,
+            requireInteraction: true,
+            silent: false,
+            timestamp: Date.now(),
+        });
+
+        notification.onclick = function () {
+            window.focus();
+            window.location.href = actionUrl;
+            notification.close();
+        };
+    }
+
+    function notifyUser(note, playSound) {
+        const added = showPersistentToast(note, playSound);
+        if (added) {
+            showNativeNotification(note);
+        }
+    }
+
+    function updateNotificationBadge(count) {
+        const badge = document.getElementById('notif-badge');
+        const countEl = document.getElementById('notif-badge-count');
+        if (!badge || !countEl) return;
+
+        if (count > 0) {
+            countEl.textContent = count > 99 ? '99+' : count;
+            badge.classList.remove('d-none');
+        } else {
+            badge.classList.add('d-none');
+        }
+    }
+
+    function updateActionSummary(count) {
+        const summary = document.getElementById('action-notif-summary');
+        if (summary) {
+            summary.textContent = count === 1 ? '1 action required' : count + ' actions required';
+        }
+    }
+
+    function renderActionNotifications(items) {
+        const container = document.getElementById('action-notifications-list');
+        if (!container) return;
+
+        const pending = (items || []).filter(function (note) {
+            return note.is_unread;
+        });
+
+        if (!pending.length) {
+            container.innerHTML = '<p class="text-secondary small px-2 py-3 mb-0">No pending actions right now.</p>';
+            return;
+        }
+
+        container.innerHTML = pending.map(function (note) {
+            const unreadClass = note.is_unread ? 'border-primary border-opacity-25 bg-theme-1-subtle' : '';
+            const actionUrl = resolveActionUrl(note);
+            return `
+                <div class="alert alert-light mb-2 action-notif-item ${unreadClass}" data-id="${note.id}">
+                    <div class="d-flex gap-2">
+                        <figure class="avatar avatar-30 rounded-circle bg-primary text-white flex-shrink-0">
+                            <i class="bi bi-exclamation-circle"></i>
+                        </figure>
+                        <div class="flex-grow-1">
+                            <p class="small fw-semibold mb-1">${escapeHtml(note.title)}</p>
+                            <p class="small mb-2 text-secondary">${escapeHtml(note.message)}</p>
+                            <div class="d-flex align-items-center justify-content-between gap-2">
+                                <span class="text-secondary" style="font-size:11px;">${note.created_human || ''}</span>
+                                <a href="${actionUrl}" class="btn btn-sm btn-outline-theme action-notif-open" data-id="${note.id}">Open</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function loadActionNotifications() {
+        $.get("{{ route('notifications.index') }}", function (response) {
+            const items = response.notifications || [];
+            renderActionNotifications(items);
+            syncUnreadToasts(items);
+            updateNotificationBadge(response.unread_total || 0);
+            updateActionSummary(response.unread_total || 0);
+        });
+    }
+
+    function markNotificationRead(id) {
+        if (!id) return;
+
+        $.ajax({
+            url: "{{ url('notifications') }}/" + id + "/read",
+            type: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            complete: function () {
+                loadActionNotifications();
+            }
+        });
+    }
+
+    function checkForNewRequests() {
+        $.ajax({
+            url: "{{ route('check-notifications') }}",
+            type: 'GET',
+            data: { last_id: lastSeenId },
+            success: function (response) {
+                if (response.count > 0) {
+                    response.notifications.forEach(function (note) {
+                        notifyUser(note, true);
+                    });
+                }
+
+                syncUnreadToasts(response.unread_notifications || []);
+                renderActionNotifications(response.unread_notifications || []);
+
+                lastSeenId = response.latest_id || lastSeenId;
+                localStorage.setItem(storageKey, lastSeenId);
+                updateNotificationBadge(response.unread_total || 0);
+                updateActionSummary(response.unread_total || 0);
+            }
+        });
+    }
+
+    function refreshDesktopPermissionBanner() {
+        const banner = document.getElementById('desktop-notif-permission');
+        if (!banner || !('Notification' in window)) return;
+
+        if (Notification.permission === 'default') {
+            banner.classList.remove('d-none');
+        } else {
+            banner.classList.add('d-none');
+        }
+    }
+
+    $(document).on('click', '.action-notif-open, .ss-toast-open', function () {
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume();
         }
     });
-}
 
-function showDesktopNotification(title, body) {
-    if ("Notification" in window && Notification.permission === "granted") {
-        new Notification(title, { body: body });
-    }
-}
+    $('#markAllNotifReadBtn').on('click', function () {
+        $.ajax({
+            url: "{{ route('notifications.read-all') }}",
+            type: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function () {
+                document.querySelectorAll('.ss-toast[data-notif-id]').forEach(function (toast) {
+                    dismissToast(toast, false);
+                });
+                dismissedToastIds.clear();
+                persistDismissedToasts();
+                loadActionNotifications();
+            }
+        });
+    });
 
-function updateNotificationBadge(count) {
-    let badge = $('#notif-badge');
-    if (badge.length) {
-        let current = parseInt(badge.text()) || 0;
-        badge.text(current + count).removeClass('d-none');
-    }
-}
+    $('#enableDesktopNotifBtn').on('click', function () {
+        if (!('Notification' in window)) return;
 
-setInterval(checkForNewRequests, 10000);
-$(document).ready(checkForNewRequests);
+        Notification.requestPermission().then(function () {
+            refreshDesktopPermissionBanner();
+        });
+    });
+
+    $('#view-notification').on('show.bs.offcanvas', function () {
+        loadActionNotifications();
+    });
+
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') {
+            loadActionNotifications();
+            checkForNewRequests();
+        }
+    });
+
+    refreshDesktopPermissionBanner();
+    document.addEventListener('click', function () {
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+    }, { once: true });
+    loadActionNotifications();
+    checkForNewRequests();
+    setInterval(checkForNewRequests, 10000);
+})();
 </script>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css">

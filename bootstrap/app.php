@@ -11,7 +11,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->alias([
+            'active.store' => \App\Http\Middleware\EnsureActiveStore::class,
+            'active.account' => \App\Http\Middleware\EnsureActiveAccount::class,
+        ]);
+
+        $middleware->appendToGroup('web', \App\Http\Middleware\EnsureActiveAccount::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

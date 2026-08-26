@@ -79,7 +79,6 @@
                                             <th>Batch Number</th>
                                            
                                             <th>Qty</th>
-                                            <th>Unit Cost</th>
                                             <th>Requisition No</th>
                                             
                                             <th>Status</th>
@@ -102,7 +101,6 @@
                                                 <td>{{$lists->batch_number}}</td>
                                                
                                                 <td> {{$lists->qty}}</td>
-                                                <td> {{$lists->amount}}</td>
                                                 <td> {{$lists->requisition_no}}</td>
                                                 <td> {{$lists->status}}</td>
                                                 <td>{{ $lists->staffname->name}}</td>

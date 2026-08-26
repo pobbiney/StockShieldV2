@@ -25,6 +25,11 @@ class UserCat extends Model
 
 	protected $fillable = [
 		'cat_name',
-		'status'
+		'status',
+		'access_all_stores',
+	];
+
+	protected $casts = [
+		'access_all_stores' => 'boolean',
 	];
 }

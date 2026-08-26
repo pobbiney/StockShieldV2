@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Stock extends Model
 {
+    protected $guarded = [];
+
       public function itemcode()
 	{
 		return $this->belongsTo(Item::class, 'item_id' ,'id'); // 'itemID' is the foreign key

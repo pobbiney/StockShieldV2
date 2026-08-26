@@ -50,6 +50,7 @@ class User extends  Authenticatable
 		'staff_id',
         'user_cat',
 		'status',
+		'department_id',
 	];
 
 	public function getUserCategory (){
@@ -80,4 +81,62 @@ class User extends  Authenticatable
 {
     return $this->belongsTo(\App\Models\Staff::class, 'staff_id', 'staff_id');
 }
+
+	public function getStoreIds(): array
+	{
+		if (empty($this->department_id)) {
+			return [];
+		}
+
+		return array_values(array_filter(array_map(
+			'intval',
+			explode('~', $this->department_id)
+		)));
+	}
+
+	public function category()
+	{
+		return $this->belongsTo(UserCat::class, 'user_cat', 'cat_id');
+	}
+
+	public function extraLinks()
+	{
+		return $this->hasMany(UserExtraLink::class, 'user_id');
+	}
+
+	public function getAccessibleLinkIds(): array
+	{
+		$roleLinks = UserCatLink::where('cat_id', $this->user_cat)->pluck('link_id')->all();
+		$extraLinks = UserExtraLink::where('user_id', $this->id)->pluck('link_id')->all();
+
+		return array_values(array_unique(array_map('intval', array_merge($roleLinks, $extraLinks))));
+	}
+
+	public function canAccessLinkRoute(string $routeName): bool
+	{
+		$accessibleLinkIds = $this->getAccessibleLinkIds();
+
+		if (empty($accessibleLinkIds)) {
+			return false;
+		}
+
+		return UserLink::whereIn('link_id', $accessibleLinkIds)
+			->where('status', 'Active')
+			->where('link_url', $routeName)
+			->exists();
+	}
+
+	public function canAccessScreen(string $pageIdSub): bool
+	{
+		$accessibleLinkIds = $this->getAccessibleLinkIds();
+
+		if (empty($accessibleLinkIds)) {
+			return false;
+		}
+
+		return UserLink::whereIn('link_id', $accessibleLinkIds)
+			->where('status', 'Active')
+			->where('page_id_sub', $pageIdSub)
+			->exists();
+	}
 }

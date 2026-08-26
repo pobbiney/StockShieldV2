@@ -82,7 +82,7 @@
                                             @foreach($listrequest as $lists)
                                             <tr>
                                                 <td>{{ $loop->iteration}}</td>
-                                                <td> Item ready for pick up from {{ $lists->storename->name}} with Requisition Number <b>{{ $lists->requisition_no}}</b></td>
+                                                <td>Item ready for pick up from {{ $lists->issuefrom->name ?? $lists->storename->name ?? 'store' }} with Requisition Number <b>{{ $lists->requisition_no}}</b></td>
                                                 <td><a href="{{ route('viewPickUp', Crypt::encrypt($lists->requisition_no)) }}" class="btn btn-success"><i class="fa fa-truck"></i> Pick up </a></td>
                                                
                                                      

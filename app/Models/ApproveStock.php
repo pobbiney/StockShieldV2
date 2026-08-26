@@ -18,6 +18,7 @@ class ApproveStock extends Model
     'store_id',
     'status',
     'created_by',
+    'source_issue_id',
 ];
 
   public function itemcode()

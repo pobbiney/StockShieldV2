@@ -71,6 +71,13 @@
                                     </div>
                                    
                                 </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="access_all_stores" value="1" id="edit_access_all_stores"
+                                        @if($categoryData->access_all_stores) checked @endif>
+                                    <label class="form-check-label" for="edit_access_all_stores">
+                                        Access all stores (Administrator, HOD, Assistant HOD)
+                                    </label>
+                                </div>
                                 <div class="text-end" style="margin-top:20px">
                                     <button type="submit" class="btn btn-primary">Update</button>
                                 </div>

@@ -14,6 +14,9 @@ use App\Http\Controllers\UserManagement\UserManagementController;
 use App\Http\Controllers\Staff\StaffController;
 use App\Http\Controllers\Settings\SettingsController;
 use App\Http\Controllers\Stock\StockController;
+use App\Http\Controllers\Stock\StockReceiptController;
+use App\Http\Controllers\Stock\SatelliteIssueController;
+use App\Http\Controllers\Stock\ReverseEntryController;
  
 
 /*  Frontend */
@@ -47,6 +50,9 @@ Route::get('user-profile',[AuthenticationController::class,'getUserProfile'])->n
 /* Authentication */ 
 
 Route::post('authentication-process',[AuthenticationController::class,'authenticationProcess'])->name('authentication-process');
+Route::get('choose-store',[AuthenticationController::class,'getChooseStoreView'])->name('choose-store')->middleware('auth');
+Route::post('select-store-process',[AuthenticationController::class,'selectStoreProcess'])->name('select-store-process')->middleware('auth');
+Route::get('switch-store',[AuthenticationController::class,'switchStore'])->name('switch-store')->middleware('auth');
 Route::post('logout-authentication-process',[DashboardController::class,'logoutAuthenticationProcess'])->name('logout-authentication-process');
 
 /** Staff Manager */
@@ -54,7 +60,9 @@ Route::get('create-staff',[StaffController::class,'addStaffView'])->name('create
 Route::post('add-staff-process',[StaffController::class,'addStaff'])->name('add-staff-process');
 Route::get('list-staff',[StaffController::class,'getStaffListView'])->name('list-staff');
 Route::get('edit-staff/{staff_id}',[StaffController::class,'getEditStaffView'])->name('edit-staff');
+Route::get('staff-id/{id}',[StaffController::class,'getStaffID'])->name('staff-id');
 Route::post('edit-staff-process/{staff_id}',[StaffController::class,'editStaff'])->name('edit-staff-process');
+Route::post('delete-staff-process/{staff_id}',[StaffController::class,'deleteStaff'])->name('delete-staff-process');
 /** End of Staff Manager */
 
 
@@ -89,6 +97,10 @@ Route::get('department',[SettingsController::class,'getDepartmentView'])->name('
 Route::post('add-department-process',[SettingsController::class,'addDepartment'])->name('add-department-process');
 Route::get('department-id/{id}',[SettingsController::class,'getdepartmentID'])->name('department-id');
 Route::post('edit-department-process',[SettingsController::class,'updateDepartment'])->name('edit-department-process');
+Route::get('ward',[SettingsController::class,'getWardView'])->name('ward')->middleware(['auth', 'active.store']);
+Route::post('add-ward-process',[SettingsController::class,'addWard'])->name('add-ward-process')->middleware(['auth', 'active.store']);
+Route::get('ward-id/{id}',[SettingsController::class,'getWardID'])->name('ward-id')->middleware(['auth', 'active.store']);
+Route::post('edit-ward-process',[SettingsController::class,'updateWard'])->name('edit-ward-process')->middleware(['auth', 'active.store']);
 Route::get('store',[SettingsController::class,'getStoreView'])->name('store');
 Route::post('add-store-process',[SettingsController::class,'addStore'])->name('add-store-process');
 Route::get('store-id/{id}',[SettingsController::class,'getstoreID'])->name('store-id');
@@ -101,17 +113,20 @@ Route::post('add-itemcategory-process',[StockController::class,'addItemCategory'
 Route::get('itemcat-id/{id}',[StockController::class,'getitemCatID'])->name('itemcat-id');
 
 Route::post('edit-itemcategory-process',[StockController::class,'updateItemCategory'])->name('edit-itemcategory-process');
+Route::post('delete-itemcategory-process/{id}',[StockController::class,'deleteItemCategory'])->name('delete-itemcategory-process');
 
 Route::get('unitOfmeasure',[StockController::class,'getunitOfmeasureView'])->name('unitOfmeasure');
 Route::post('add-unitofmeasure-process',[StockController::class,'addUnitOfMeasure'])->name('add-unitofmeasure-process');
 Route::get('unitofmeasure-id/{id}',[StockController::class,'getUnitofMeasureID'])->name('unitofmeasure-id');
 
 Route::post('edit-unitofmeasure-process',[StockController::class,'updateUnitOfMeasure'])->name('edit-unitofmeasure-process');
+Route::post('delete-unitofmeasure-process/{id}',[StockController::class,'deleteUnitOfMeasure'])->name('delete-unitofmeasure-process');
 
-Route::get('Item',[StockController::class,'getItemView'])->name('Item');
-Route::post('add-item-process',[StockController::class,'addItem'])->name('add-item-process');
-Route::post('update-item-process',[StockController::class,'updateItem'])->name('update-item-process');
-Route::get('item-id/{id}',[StockController::class,'getItemID'])->name('item-id');
+Route::get('Item',[StockController::class,'getItemView'])->name('Item')->middleware(['auth', 'active.store']);
+Route::post('add-item-process',[StockController::class,'addItem'])->name('add-item-process')->middleware(['auth', 'active.store']);
+Route::post('update-item-process',[StockController::class,'updateItem'])->name('update-item-process')->middleware(['auth', 'active.store']);
+Route::get('item-id/{id}',[StockController::class,'getItemID'])->name('item-id')->middleware(['auth', 'active.store']);
+Route::post('delete-item-process/{id}',[StockController::class,'deleteItem'])->name('delete-item-process')->middleware(['auth', 'active.store']);
 
 Route::get('reOrder',[StockController::class,'getreOrderView'])->name('reOrder');
 Route::post('add-reorderlevel-process',[StockController::class,'addreorderlevel'])->name('add-reorderlevel-process');
@@ -120,6 +135,7 @@ Route::get('Supplier',[StaffController::class,'getSupplierView'])->name('Supplie
 Route::post('add-supplier-process',[StaffController::class,'addSupplier'])->name('add-supplier-process');
 Route::get('supplier-id/{id}',[StaffController::class,'getSupplierID'])->name('supplier-id');
 Route::post('update-supplier-process',[StaffController::class,'updateSupplier'])->name('update-supplier-process');
+Route::post('delete-supplier-process/{id}',[StaffController::class,'deleteSupplier'])->name('delete-supplier-process');
 Route::post('add-stock-process',[StockController::class,'addStock'])->name('add-stock-process');
 Route::get('stock-id/{id}',[StockController::class,'getStockID'])->name('stock-id');
 
@@ -127,6 +143,8 @@ Route::get('stockEntry/{id}/delete', [StockController::class, 'deleteStockItem']
 Route::post('edit-stock-process',[StockController::class,'updateStock'])->name('edit-stock-process');
 Route::get('stockApproval',[StockController::class,'getstockApprovalView'])->name('stockApproval');
 Route::get('/stockApproval/{id}', [StockController::class, 'ApproveStock'])->name('stock.stockApproval');
+Route::post('/stock/reject/{id}', [StockController::class, 'rejectStock'])->name('stock.reject');
+Route::post('/stock/reject-all/{store_id}', [StockController::class, 'rejectAll'])->name('stock.rejectAll');
  
 
     Route::get('/approve-all-stock/{store_id}', [StockController::class,'approveAll'])
@@ -157,7 +175,27 @@ Route::get('issue-item-id/{id}',[StockController::class,'getIssueItemID'])->name
 Route::post('add-rejection-process', [StockController::class, 'addItemRejection'])->name('add-rejection-process');
 Route::get('MyRequest',[StockController::class,'getMyRequestView'])->name('MyRequest');
 Route::get('viewStockEntry/{store_id}',[StockController::class,'getviewStockEntry'])->name('viewStockEntry');
- 
+
+Route::get('ReceiveStock', [StockReceiptController::class, 'index'])->name('ReceiveStock')->middleware(['auth', 'active.store']);
+Route::get('viewReceiveStock/{requisition_no}', [StockReceiptController::class, 'show'])->name('viewReceiveStock')->middleware(['auth', 'active.store']);
+Route::post('acceptReceiveStock/{requisition_no}', [StockReceiptController::class, 'accept'])->name('acceptReceiveStock')->middleware(['auth', 'active.store']);
+
+Route::get('IssueItemSatellite', [SatelliteIssueController::class, 'index'])->name('IssueItemSatellite')->middleware(['auth', 'active.store']);
+Route::post('add-satellite-issue-process', [SatelliteIssueController::class, 'add'])->name('add-satellite-issue-process')->middleware(['auth', 'active.store']);
+Route::get('IssueItemSatellite/{id}/delete', [SatelliteIssueController::class, 'destroy'])->name('satellite-issue.delete')->middleware(['auth', 'active.store']);
+Route::get('/submit-satellite-issue', [SatelliteIssueController::class, 'submit'])->name('satellite-issue.submit')->middleware(['auth', 'active.store']);
+Route::get('/issue-satellite-batch/{issue_no}', [SatelliteIssueController::class, 'issueBatch'])->name('satellite-issue.issue-batch')->middleware(['auth', 'active.store']);
+Route::get('/satellite-issue/print/{issue_no}', [SatelliteIssueController::class, 'printIssueSlip'])->name('satellite-issue.print')->middleware(['auth', 'active.store']);
+Route::post('/get-satellite-batch-number', [SatelliteIssueController::class, 'getBatchNumber'])->name('get.satellite.batch.number')->middleware(['auth', 'active.store']);
+
+Route::get('reverseEntry', [ReverseEntryController::class, 'index'])->name('reverseEntry')->middleware(['auth', 'active.store']);
+Route::post('add-reverse-entry-process', [ReverseEntryController::class, 'store'])->name('add-reverse-entry-process')->middleware(['auth', 'active.store']);
+Route::get('reverse-entry/batch', [ReverseEntryController::class, 'batchLookup'])->name('reverse-entry.batch')->middleware(['auth', 'active.store']);
+Route::get('reverse-entry-id/{id}', [ReverseEntryController::class, 'getBatchById'])->name('reverse-entry-id')->middleware(['auth', 'active.store']);
+Route::get('reverseEntryApproval', [ReverseEntryController::class, 'approvalIndex'])->name('reverseEntryApproval')->middleware(['auth', 'active.store']);
+Route::post('reverse-entry/{reversal}/approve', [ReverseEntryController::class, 'approve'])->name('reverse-entry.approve')->middleware(['auth', 'active.store']);
+Route::post('reverse-entry/{reversal}/reject', [ReverseEntryController::class, 'reject'])->name('reverse-entry.reject')->middleware(['auth', 'active.store']);
+
 /* End of Stock Management */
 
 /* Reports */
@@ -263,10 +301,10 @@ Route::post('approve-issues-process', [RequisitionController::class, 'addApprove
 /* Issues */
 Route::get('viewStoreRequest/{requisition_no}',[IssueController::class,'getviewStoreRequest'])->name('viewStoreRequest');
 Route::post('issue-request-process', [IssueController::class, 'addIssueRequest'])->name('issue-request-process');
-Route::get('PickList',[RequisitionController::class,'getPickListView'])->name('PickList'); 
-Route::get('viewPickUp/{requisition_no}',[RequisitionController::class,'getviewPickList'])->name('viewPickUp');
+Route::get('PickList',[RequisitionController::class,'getPickListView'])->name('PickList')->middleware(['auth', 'active.store']);
+Route::get('viewPickUp/{requisition_no}',[RequisitionController::class,'getviewPickList'])->name('viewPickUp')->middleware(['auth', 'active.store']);
 Route::get('/stock/print/{invoice}', [RequisitionController::class, 'printPickList'])
-    ->name('requisition.print');
+    ->name('requisition.print')->middleware(['auth', 'active.store']);
 
 Route::get('Return',[RequisitionController::class,'getReturnView'])->name('Return'); 
 Route::get('return-item-id/{id}',[RequisitionController::class,'getreturnItemID'])->name('return-item-id');
@@ -276,7 +314,10 @@ Route::post('add-retrun-item-approval-process', [RequisitionController::class, '
 Route::get('return-item-approval-id/{id}',[RequisitionController::class,'getreturnItemApprovalID'])->name('return-item-approval-id');
 
 // routes/web.php
-Route::get('check-notifications', [NotificationController::class, 'checkNew'])->name('check-notifications');
+Route::get('check-notifications', [NotificationController::class, 'checkNew'])->name('check-notifications')->middleware('auth');
+Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index')->middleware('auth');
+Route::post('notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read')->middleware('auth');
+Route::post('notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all')->middleware('auth');
 
 
 /* End of Issues*/

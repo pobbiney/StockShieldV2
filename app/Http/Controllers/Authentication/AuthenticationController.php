@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Log; // Add this import for Log
 use App\Http\Controllers\SMS\SMSController;
 use App\Models\Staff;
 use App\Models\UsrUserLog;
+use App\Services\StoreContext;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\SendMail;
 use App\Mail\SendPasswordMail;
@@ -117,6 +118,13 @@ class AuthenticationController extends Controller
         return back()->with(
             'message_error',
             "Invalid email or password. {$attemptsLeft} attempt(s) left before account lock."
+        );
+    }
+
+    if (($user->status ?? 'Active') !== 'Active') {
+        return back()->with(
+            'message_error',
+            'Your account has been blocked. Contact your administrator.'
         );
     }
 
@@ -258,6 +266,13 @@ class AuthenticationController extends Controller
         );
     }
 
+    if (($user->status ?? 'Active') !== 'Active') {
+        return back()->with(
+            'login_error_message',
+            'Your account has been blocked. Contact your administrator.'
+        );
+    }
+
     // Login successful
     Auth::login($user);
 
@@ -277,8 +292,109 @@ class AuthenticationController extends Controller
 
     session()->put('userLogId', $insertLogs->id);
 
-    return redirect()->intended('dashboard');
+    $storeContext = app(StoreContext::class);
+
+    if ($storeContext->hasGlobalStoreAccess($user)) {
+        $storeContext->clearActiveStore();
+
+        return redirect()->intended('dashboard');
+    }
+
+    $mappedStoreIds = $storeContext->getMappedStoreIds($user);
+
+    if (empty($mappedStoreIds)) {
+        Auth::logout();
+
+        return back()->with('login_error_message', 'No store assigned. Contact administrator.');
+    }
+
+    if (count($mappedStoreIds) === 1) {
+        $storeContext->setActiveStore($mappedStoreIds[0]);
+
+        return redirect()->intended('dashboard');
+    }
+
+    return redirect()->route('choose-store');
         
+    }
+
+    public function getChooseStoreView()
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return redirect()->route('admin-login');
+        }
+
+        $storeContext = app(StoreContext::class);
+
+        if ($storeContext->hasGlobalStoreAccess($user)) {
+            return redirect()->route('dashboard');
+        }
+
+        $mappedStores = $storeContext->getMappedStores($user);
+
+        if ($mappedStores->isEmpty()) {
+            Auth::logout();
+
+            return redirect()->route('admin-login')
+                ->with('login_error_message', 'No store assigned. Contact administrator.');
+        }
+
+        if ($mappedStores->count() === 1) {
+            $storeContext->setActiveStore($mappedStores->first()->id);
+
+            return redirect()->route('dashboard');
+        }
+
+        $userCat = \App\Models\UserCat::find($user->user_cat);
+
+        return view('authentication.choose-store', [
+            'mappedStores' => $mappedStores,
+            'userRole' => $userCat->cat_name ?? 'User',
+            'storeCount' => $mappedStores->count(),
+            'centralCount' => $mappedStores->where('store_group', 'central')->count(),
+            'satelliteCount' => $mappedStores->where('store_group', 'satellite')->count(),
+        ]);
+    }
+
+    public function selectStoreProcess(Request $request)
+    {
+        $request->validate([
+            'store_id' => 'required|integer',
+        ]);
+
+        $user = Auth::user();
+        $storeContext = app(StoreContext::class);
+
+        if (!$user || $storeContext->hasGlobalStoreAccess($user)) {
+            return redirect()->route('dashboard');
+        }
+
+        $storeId = (int) $request->store_id;
+
+        if (!$storeContext->canAccessStore($user, $storeId)) {
+            return back()->with('message_error', 'You are not assigned to this store.');
+        }
+
+        $storeContext->setActiveStore($storeId);
+
+        return redirect()->route('dashboard')
+            ->with('message_success', 'Store selected successfully.');
+    }
+
+    public function switchStore()
+    {
+        $user = Auth::user();
+        $storeContext = app(StoreContext::class);
+
+        if (!$user || $storeContext->hasGlobalStoreAccess($user)) {
+            return redirect()->route('dashboard');
+        }
+
+        $storeContext->clearActiveStore();
+
+        return redirect()->route('choose-store');
     }
 
     public function getUserProfile()

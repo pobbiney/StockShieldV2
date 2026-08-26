@@ -553,17 +553,13 @@ tfoot td {
         <th>Item Code</th>
         <th>Item Description</th>
         <th>UoM</th>
-        <th>Price GH₵</th>
         <th>Qty.</th>
-        <th>Total</th>
       </tr>
     </thead>
     <tbody>
-      @php  $grandTotal = 0; $totalqty = 0; @endphp
+      @php $totalqty = 0; @endphp
       @foreach ($listissues as $list)
           @php
-            $lineTotal = $list->amount * $list->qty;
-            $grandTotal += $lineTotal;
             $totalqty += $list->qty;
         @endphp
       
@@ -572,9 +568,7 @@ tfoot td {
         <td> {{ $list->itemcode->item_code }}</td>
         <td>{{ $list->itemname->name }}</td>
          <td>{{$list->itemname->unitname->name }}</td>
-        <td>{{ number_format($list->amount,2) }}</td>
         <td>{{ $list->qty }}</td>
-        <td>{{ number_format($lineTotal,2)}}</td>
       </tr>
       
       @endforeach
@@ -583,10 +577,8 @@ tfoot td {
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="5"><span class="total-label" style="float: right">Grand Total</span></td>
-       
-          <td><strong> {{ $totalqty }}</strong></td>
-          <td><strong style="float: left">GH₵  {{ number_format($grandTotal,2)}}</strong></td>
+          <td colspan="4"><span class="total-label" style="float: right">Total Quantity</span></td>
+          <td><strong>{{ $totalqty }}</strong></td>
         </tr>
       </tfoot>
     </table>

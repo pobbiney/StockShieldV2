@@ -16,22 +16,122 @@ use Illuminate\Support\Facades\Auth;
 use Milon\Barcode\Facades\DNS1DFacade as DNS1D;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use App\Imports\ItemsImport;
 use App\Models\ItemRequest;
+use App\Models\SatelliteStockEntry;
+use App\Models\SatelliteStockReceipt;
+use App\Models\ReturnItem;
+use App\Services\StoreContext;
+use App\Services\StockApprovalService;
+use App\Services\NotificationService;
+use Illuminate\Http\UploadedFile;
+use Maatwebsite\Excel\Excel as ExcelFormat;
+use Maatwebsite\Excel\Exceptions\NoTypeDetectedException;
 use Maatwebsite\Excel\Facades\Excel;
  
 
  
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Crypt;
 
 
 class StockController extends Controller
 {
+    public function __construct(
+        protected StoreContext $storeContext,
+        protected StockApprovalService $stockApproval,
+        protected NotificationService $notifications,
+    ) {
+    }
+
+    protected function resolveStoreIdForStockEntry(Request $request, ?Stock $existingStock = null): int
+    {
+        if ($this->storeContext->hasGlobalStoreAccess()) {
+            $storeId = (int) ($request->store ?? $request->store_id);
+
+            if (!Store::where('id', $storeId)->exists()) {
+                abort(422, 'Invalid store selected.');
+            }
+
+            return $storeId;
+        }
+
+        $activeStoreId = $this->storeContext->getActiveStoreId();
+
+        if (!$activeStoreId) {
+            abort(403, 'No active store selected.');
+        }
+
+        if ($existingStock && (int) $existingStock->store_id !== $activeStoreId) {
+            abort(403, 'Unauthorized access to this stock entry.');
+        }
+
+        return $activeStoreId;
+    }
+
+    protected function assertCanApproveStock(): void
+    {
+        if (!$this->stockApproval->canApproveStock()) {
+            abort(403, 'You are not authorized to approve stock entries.');
+        }
+    }
+
+    protected function assertPendingStockInScope(Stock $stock): void
+    {
+        if ($stock->status !== 'pending') {
+            abort(403, 'Only pending stock entries can be modified.');
+        }
+
+        if (!in_array((int) $stock->store_id, $this->storeContext->getScopedStoreIds(), true)) {
+            abort(403, 'Unauthorized access to this stock entry.');
+        }
+    }
+
+    protected function itemBelongsToScopedStores(Item $item): bool
+    {
+        return in_array((int) $item->store_id, $this->storeContext->getScopedStoreIds(), true);
+    }
+
+    protected function resolveStoreIdForItem(Request $request, ?Item $existingItem = null): int
+    {
+        if ($this->storeContext->hasGlobalStoreAccess()) {
+            return (int) $request->store_id;
+        }
+
+        $activeStoreId = $this->storeContext->getActiveStoreId();
+
+        if (!$activeStoreId) {
+            abort(403, 'No active store selected.');
+        }
+
+        if ($existingItem && (int) $existingItem->store_id !== $activeStoreId) {
+            abort(403, 'Unauthorized access to this item.');
+        }
+
+        return $activeStoreId;
+    }
+
     public function getItemCatView()
     {
-        $list = ItemCategory::all();
-        return view('stock.ItemCategory',['list'=>$list]);
+        $list = ItemCategory::orderByDesc('id')->get();
+        $totalCategories = ItemCategory::count();
+        $activeCount = ItemCategory::where('status', 'Active')->count();
+        $inactiveCount = ItemCategory::where('status', 'Inactive')->count();
+        $categoriesWithItems = Item::whereNotNull('cat_id')
+            ->pluck('cat_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->all();
+
+        return view('stock.ItemCategory', [
+            'list' => $list,
+            'totalCategories' => $totalCategories,
+            'activeCount' => $activeCount,
+            'inactiveCount' => $inactiveCount,
+            'categoriesWithItems' => $categoriesWithItems,
+        ]);
     }
 
      public function getitemCatID($id)
@@ -45,55 +145,99 @@ class StockController extends Controller
         $request->validate([
             'name' => 'required',
             'status' => 'required',
-            
-            
         ]);
-            $insertCat = new ItemCategory();
-            $insertCat->name = trim($request->name);
-            $insertCat->status = $request->status;
-          
-           
-            $insertCat = $insertCat->save();
-            return $insertCat ? back()->with('message_success','Item Category   added successfully') : back()->with('message_error','Something went wrong, please try again.');
+
+        $category = new ItemCategory();
+        $category->name = trim($request->name);
+        $category->status = $request->status;
+
+        $status = $category->save();
+
+        return $status
+            ? redirect()->route('ItemCategory')->with('message_success', 'Item category added successfully')
+            : redirect()->route('ItemCategory')->with('message_error', 'Something went wrong, please try again.')->withInput();
     }
 
      public function updateItemCategory(Request $request)
     {
-          $request->validate([
+        $request->validate([
             'name' => 'required',
             'status' => 'required',
-            
-            
         ]);
-            $insertCat = ItemCategory::find($request->cat_id);
-            $insertCat->name = trim($request->name);
-            $insertCat->status = $request->status;
-            
-            $insertCat = $insertCat->save();
-            return $insertCat ? back()->with('message_success','Item Category updated successfully') : back()->with('message_error','Something went wrong, please try again.');
+
+        $category = ItemCategory::find($request->cat_id);
+
+        if (!$category) {
+            return redirect()->route('ItemCategory')->with('message_error', 'Item category not found.');
+        }
+
+        $category->name = trim($request->name);
+        $category->status = $request->status;
+
+        $status = $category->save();
+
+        return $status
+            ? redirect()->route('ItemCategory')->with('message_success', 'Item category updated successfully')
+            : redirect()->route('ItemCategory')->with('message_error', 'Something went wrong, please try again.')->withInput();
+    }
+
+    public function deleteItemCategory($id)
+    {
+        $category = ItemCategory::find($id);
+
+        if (!$category) {
+            return redirect()->route('ItemCategory')->with('message_error', 'Item category not found.');
+        }
+
+        if (Item::where('cat_id', $id)->exists()) {
+            return redirect()->route('ItemCategory')->with(
+                'message_error',
+                'Cannot delete this category because it is linked to one or more items.'
+            );
+        }
+
+        $category->delete();
+
+        return redirect()->route('ItemCategory')->with('message_success', 'Item category deleted successfully.');
     }
 
     public function getunitOfmeasureView()
     {
-         $list = UnitOfMeasure::all();
-        return view('stock.unitOfmeasure',['list'=>$list]);
+        $list = UnitOfMeasure::orderByDesc('id')->get();
+        $totalUnits = UnitOfMeasure::count();
+        $activeCount = UnitOfMeasure::where('status', 'Active')->count();
+        $inactiveCount = UnitOfMeasure::where('status', 'Inactive')->count();
+        $unitsWithItems = Item::whereNotNull('unit_id')
+            ->pluck('unit_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->all();
+
+        return view('stock.unitOfmeasure', [
+            'list' => $list,
+            'totalUnits' => $totalUnits,
+            'activeCount' => $activeCount,
+            'inactiveCount' => $inactiveCount,
+            'unitsWithItems' => $unitsWithItems,
+        ]);
     }
 
     public function addUnitOfMeasure(Request $request)
     {
-          $request->validate([
+        $request->validate([
             'name' => 'required',
             'status' => 'required',
-            
-            
         ]);
-            $insertCat = new UnitOfMeasure();
-            $insertCat->name = trim($request->name);
-            $insertCat->status = $request->status;
-          
-           
-            $insertCat = $insertCat->save();
-            return $insertCat ? back()->with('message_success','Unit Of Issue  added successfully') : back()->with('message_error','Something went wrong, please try again.');
+
+        $unit = new UnitOfMeasure();
+        $unit->name = trim($request->name);
+        $unit->status = $request->status;
+
+        $status = $unit->save();
+
+        return $status
+            ? redirect()->route('unitOfmeasure')->with('message_success', 'Unit of issue added successfully')
+            : redirect()->route('unitOfmeasure')->with('message_error', 'Something went wrong, please try again.')->withInput();
     }
 
      public function getUnitofMeasureID($id)
@@ -104,31 +248,121 @@ class StockController extends Controller
 
      public function updateUnitOfMeasure(Request $request)
     {
-          $request->validate([
+        $request->validate([
             'name' => 'required',
             'status' => 'required',
-            
-            
         ]);
-            $insertCat = UnitOfMeasure::find($request->cat_id);
-            $insertCat->name = trim($request->name);
-            $insertCat->status = $request->status;
-            
-            $insertCat = $insertCat->save();
-            return $insertCat ? back()->with('message_success','Unit of Issue updated successfully') : back()->with('message_error','Something went wrong, please try again.');
+
+        $unit = UnitOfMeasure::find($request->cat_id);
+
+        if (!$unit) {
+            return redirect()->route('unitOfmeasure')->with('message_error', 'Unit of issue not found.');
+        }
+
+        $unit->name = trim($request->name);
+        $unit->status = $request->status;
+
+        $status = $unit->save();
+
+        return $status
+            ? redirect()->route('unitOfmeasure')->with('message_success', 'Unit of issue updated successfully')
+            : redirect()->route('unitOfmeasure')->with('message_error', 'Something went wrong, please try again.')->withInput();
+    }
+
+    public function deleteUnitOfMeasure($id)
+    {
+        $unit = UnitOfMeasure::find($id);
+
+        if (!$unit) {
+            return redirect()->route('unitOfmeasure')->with('message_error', 'Unit of issue not found.');
+        }
+
+        if (Item::where('unit_id', $id)->exists()) {
+            return redirect()->route('unitOfmeasure')->with(
+                'message_error',
+                'Cannot delete this unit because it is linked to one or more items.'
+            );
+        }
+
+        $unit->delete();
+
+        return redirect()->route('unitOfmeasure')->with('message_success', 'Unit of issue deleted successfully.');
     }
 
     public function getItemView()
     {
-       
-        $listcat = ItemCategory::all();
-        $listunit = UnitOfMeasure::all();
-        $listdept = array_map('intval', explode('~', Auth::user()->department_id));  
-        $getstoreid = Store::whereIn('id', $listdept)->get();  
+        $listcat = ItemCategory::orderBy('name')->get();
+        $listunit = UnitOfMeasure::orderBy('name')->get();
+        $scopedStoreIds = $this->storeContext->getScopedStoreIds();
+        $isGlobalAccess = $this->storeContext->hasGlobalStoreAccess();
+        $activeStore = $this->storeContext->getActiveStore();
+        $getstoreid = Store::whereIn('id', $scopedStoreIds)->orderBy('name')->get();
 
-         $list = Item::whereIn('store_id',$listdept)->where('status','Active')->get();
-       
-        return view('stock.Item',['list'=>$list,'listcat'=>$listcat,'listunit'=>$listunit,'getstoreid'=>$getstoreid]);
+        $baseQuery = Item::whereIn('store_id', $scopedStoreIds);
+        $list = (clone $baseQuery)
+            ->with(['categoryname', 'unitname', 'storename'])
+            ->orderByDesc('id')
+            ->get();
+
+        $totalItems = (clone $baseQuery)->count();
+        $categoriesUsed = (clone $baseQuery)->whereNotNull('cat_id')->distinct()->count('cat_id');
+
+        $categoryStats = (clone $baseQuery)
+            ->select('cat_id', DB::raw('COUNT(*) as item_count'))
+            ->whereNotNull('cat_id')
+            ->groupBy('cat_id')
+            ->orderByDesc('item_count')
+            ->get()
+            ->map(function ($row) use ($listcat, $totalItems) {
+                $cat = $listcat->firstWhere('id', $row->cat_id);
+                $count = (int) $row->item_count;
+
+                return [
+                    'id' => (int) $row->cat_id,
+                    'name' => $cat->name ?? 'Uncategorized',
+                    'count' => $count,
+                    'pct' => $totalItems > 0 ? round(($count / $totalItems) * 100) : 0,
+                ];
+            })
+            ->values();
+
+        $topCategory = $categoryStats->first();
+
+        $itemsWithUsage = Stock::whereNotNull('item_id')
+            ->pluck('item_id')
+            ->merge(ApproveStock::whereNotNull('item_id')->pluck('item_id'))
+            ->merge(ItemIssue::whereNotNull('item_id')->pluck('item_id'))
+            ->merge(ItemRequest::whereNotNull('item_id')->pluck('item_id'));
+
+        if (Schema::hasTable('return_items')) {
+            $itemsWithUsage = $itemsWithUsage->merge(
+                ReturnItem::whereNotNull('item_id')->pluck('item_id')
+            );
+        }
+
+        $itemsWithUsage = $itemsWithUsage
+            ->unique()
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $lastItem = Item::latest('id')->first();
+        $number = $lastItem ? $lastItem->id + 1 : 1;
+        $itemCodePreview = 'ITM-' . str_pad($number, 5, '0', STR_PAD_LEFT);
+
+        return view('stock.Item', [
+            'list' => $list,
+            'listcat' => $listcat,
+            'listunit' => $listunit,
+            'getstoreid' => $getstoreid,
+            'totalItems' => $totalItems,
+            'categoriesUsed' => $categoriesUsed,
+            'categoryStats' => $categoryStats,
+            'topCategory' => $topCategory,
+            'itemsWithUsage' => $itemsWithUsage,
+            'itemCodePreview' => $itemCodePreview,
+            'isGlobalAccess' => $isGlobalAccess,
+            'activeStore' => $activeStore,
+        ]);
     }
 
     public function addItem(Request $request)
@@ -138,50 +372,49 @@ class StockController extends Controller
             'unit_of_measure_id' =>'required',
             'category_id' => 'required',
             'status'=>'required',
-            'store_id' => 'required',
+            'store_id' => $this->storeContext->hasGlobalStoreAccess() ? 'required' : 'nullable',
             're_order_level' => 'required'
         ]);
 
-        if(Item::where('name',$request->name)->get()->count() > 0){
+        $storeId = $this->resolveStoreIdForItem($request);
 
-            return back()->with('message_error','Item already exist');
-
-        }else{
-
-          // Generate Item Code
-        $lastItem = Item::latest('id')->first();
-
-        if($lastItem){
-            $number = $lastItem->id + 1;
-        } else {
-            $number = 1;
+        if (!$this->storeContext->canAccessStore(Auth::user(), $storeId)) {
+            return redirect()->route('Item')->with('message_error', 'You are not authorized to add items to this store.')->withInput();
         }
 
+        if (Item::where('name', $request->name)->where('store_id', $storeId)->exists()) {
+            return redirect()->route('Item')->with('message_error', 'Item already exist in this store')->withInput();
+        }
+
+        $lastItem = Item::latest('id')->first();
+        $number = $lastItem ? $lastItem->id + 1 : 1;
         $itemCode = 'ITM-' . str_pad($number, 5, '0', STR_PAD_LEFT);
 
-            $insertCat = new Item();
-             $insertCat->item_code = $itemCode;
-            $insertCat->name = trim($request->name);
-            $insertCat->cat_id = $request->category_id;
-            $insertCat->unit_id = $request->unit_of_measure_id;
-            $insertCat->store_id = $request->store_id;
-            $insertCat->reorder_level = $request->re_order_level ;
-             $insertCat->status = $request->status;
-             
-            $insertCat->created_by = Auth::User()->id;
-             
-            $status = $insertCat->save();
+        $item = new Item();
+        $item->item_code = $itemCode;
+        $item->name = trim($request->name);
+        $item->cat_id = $request->category_id;
+        $item->unit_id = $request->unit_of_measure_id;
+        $item->store_id = $storeId;
+        $item->reorder_level = $request->re_order_level;
+        $item->status = $request->status;
+        $item->created_by = Auth::user()->id;
 
-            return $status ? back()->with('message_success','Item added successfully') : back()->with('message_error','Something went wrong, please try again.');
+        $status = $item->save();
 
-
-        }
-
+        return $status
+            ? redirect()->route('Item')->with('message_success', 'Item added successfully')
+            : redirect()->route('Item')->with('message_error', 'Something went wrong, please try again.')->withInput();
     }
 
       public function getItemID($id)
     {
          $data = Item::findOrFail($id);
+
+         if (!$this->itemBelongsToScopedStores($data)) {
+             abort(403, 'Unauthorized access to this item.');
+         }
+
           return response()->json($data);
     }
 
@@ -192,25 +425,73 @@ class StockController extends Controller
             'unit_of_measure_id' =>'required',
             'category_id' => 'required',
             'status'=>'required',
-            'store_id' => 'required',
+            'store_id' => $this->storeContext->hasGlobalStoreAccess() ? 'required' : 'nullable',
             're_order_level' => 'required'
         ]);
 
        
-            $insertCat = Item::find($request->item_id);
-            $insertCat->name = trim($request->name);
-            $insertCat->cat_id = $request->category_id;
-            $insertCat->unit_id = $request->unit_of_measure_id;
-            $insertCat->store_id = $request->store_id;
-             $insertCat->status = $request->status;
-             $insertCat->reorder_level = $request->re_order_level ;
-              $insertCat->updated_by = Auth::User()->id;
-             
-             
-            $status = $insertCat->save();
+        $item = Item::find($request->item_id);
 
-            return $status ? back()->with('message_success','Item updated successfully') : back()->with('message_error','Something went wrong, please try again.');
+        if (!$item) {
+            return redirect()->route('Item')->with('message_error', 'Item not found.');
+        }
 
+        if (!$this->itemBelongsToScopedStores($item)) {
+            abort(403, 'Unauthorized access to this item.');
+        }
+
+        $storeId = $this->resolveStoreIdForItem($request, $item);
+
+        if (Item::where('name', $request->name)
+            ->where('store_id', $storeId)
+            ->where('id', '!=', $item->id)
+            ->exists()) {
+            return redirect()->route('Item')->with('message_error', 'Item already exist in this store')->withInput();
+        }
+
+        $item->name = trim($request->name);
+        $item->cat_id = $request->category_id;
+        $item->unit_id = $request->unit_of_measure_id;
+        $item->store_id = $storeId;
+        $item->status = $request->status;
+        $item->reorder_level = $request->re_order_level;
+        $item->updated_by = Auth::user()->id;
+
+        $status = $item->save();
+
+        return $status
+            ? redirect()->route('Item')->with('message_success', 'Item updated successfully')
+            : redirect()->route('Item')->with('message_error', 'Something went wrong, please try again.')->withInput();
+    }
+
+    public function deleteItem($id)
+    {
+        $item = Item::find($id);
+
+        if (!$item) {
+            return redirect()->route('Item')->with('message_error', 'Item not found.');
+        }
+
+        if (!$this->itemBelongsToScopedStores($item)) {
+            abort(403, 'Unauthorized access to this item.');
+        }
+
+        $hasUsage = Stock::where('item_id', $id)->exists()
+            || ApproveStock::where('item_id', $id)->exists()
+            || ItemIssue::where('item_id', $id)->exists()
+            || ItemRequest::where('item_id', $id)->exists()
+            || (Schema::hasTable('return_items') && ReturnItem::where('item_id', $id)->exists());
+
+        if ($hasUsage) {
+            return redirect()->route('Item')->with(
+                'message_error',
+                'Cannot delete this item because it is linked to stock or transaction records.'
+            );
+        }
+
+        $item->delete();
+
+        return redirect()->route('Item')->with('message_success', 'Item deleted successfully.');
     }
     
 
@@ -240,69 +521,186 @@ class StockController extends Controller
     }
     
 
+    protected function isSatelliteStockContext(): bool
+    {
+        return $this->storeContext->getActiveStore()?->store_group === 'satellite';
+    }
+
+    protected function assertPendingSatelliteStockEntryInScope(SatelliteStockEntry $entry): void
+    {
+        if ($entry->status !== 'pending') {
+            abort(403, 'Only pending stock entries can be modified.');
+        }
+
+        if (!in_array((int) $entry->store_id, $this->storeContext->getScopedStoreIds(), true)) {
+            abort(403, 'Unauthorized access to this stock entry.');
+        }
+    }
+
+    protected function storeUsesSatelliteStockEntry(?Store $store = null): bool
+    {
+        $store = $store ?? $this->storeContext->getActiveStore();
+
+        return $store?->store_group === 'satellite';
+    }
+
+    protected function generateBarcodeAssets(?string $barCode = null): array
+    {
+        $barcode = $barCode ?: 'SS' . rand(10000000, 99999999);
+        $barcodeImage = DNS1D::getBarcodePNG($barcode, 'C128');
+        $folderPath = public_path('barcodes');
+
+        if (!File::exists($folderPath)) {
+            File::makeDirectory($folderPath, 0755, true);
+        }
+
+        $imageName = $barcode . '.png';
+        file_put_contents($folderPath . '/' . $imageName, base64_decode($barcodeImage));
+
+        return [
+            'barcode' => $barcode,
+            'barcode_path' => 'barcodes/' . $imageName,
+        ];
+    }
+
+    protected function buildStockEntryView()
+    {
+        $scopedStoreIds = $this->storeContext->getScopedStoreIds();
+
+        if (empty($scopedStoreIds)) {
+            return redirect()->route('choose-store')
+                ->with('message_error', 'Select a store before recording stock entries.');
+        }
+
+        $isSatelliteStore = $this->isSatelliteStockContext();
+
+        $listsup = Supplier::where('status', 'Active')->orderBy('company')->get();
+        $getItemid = $isSatelliteStore
+            ? Item::with('storename')->where('status', 'Active')->orderBy('name')->get()
+            : Item::whereIn('store_id', $scopedStoreIds)->where('status', 'Active')->orderBy('name')->get();
+        $getstoreId = Store::whereIn('id', $scopedStoreIds)->orderBy('name')->get();
+
+        if ($isSatelliteStore) {
+            $liststock = SatelliteStockEntry::with(['itemcode', 'itemname', 'supname', 'storename'])
+                ->whereIn('store_id', $scopedStoreIds)
+                ->where('status', 'pending')
+                ->orderByDesc('id')
+                ->get();
+        } else {
+            $liststock = Stock::with(['itemcode', 'itemname', 'supname', 'storename'])
+                ->whereIn('store_id', $scopedStoreIds)
+                ->where('status', 'pending')
+                ->orderByDesc('id')
+                ->get();
+        }
+
+        $pendingCount = $liststock->count();
+        $totalQty = (int) $liststock->sum('qty');
+        $totalValue = $liststock->sum(fn ($s) => (float) ($s->qty ?? 0) * (float) ($s->amount ?? 0));
+        $uniqueItems = $liststock->pluck('item_id')->unique()->count();
+        $uniquePct = $pendingCount > 0 ? min(100, (int) round(($uniqueItems / $pendingCount) * 100)) : 0;
+
+        $storeBreakdown = $liststock->groupBy('store_id')->map(function ($rows, $storeId) {
+            return [
+                'name' => optional($rows->first()->storename)->name ?? 'Store #' . $storeId,
+                'count' => $rows->count(),
+            ];
+        });
+
+        return view('stock.stockEntry', [
+            'getItemid' => $getItemid,
+            'listsup' => $listsup,
+            'getstoreId' => $getstoreId,
+            'liststock' => $liststock,
+            'pendingCount' => $pendingCount,
+            'totalQty' => $totalQty,
+            'totalValue' => $totalValue,
+            'uniqueItems' => $uniqueItems,
+            'uniquePct' => $uniquePct,
+            'storeBreakdown' => $storeBreakdown,
+            'requiresApproval' => $this->stockApproval->requiresApproval(),
+            'canApproveStock' => $isSatelliteStore ? false : $this->stockApproval->canApproveStock(),
+            'activeStoreId' => $this->storeContext->getActiveStoreId(),
+            'isSatelliteStore' => $isSatelliteStore,
+        ]);
+    }
+
     public function getstockEntryView()
     {
-        $listsup = Supplier::all();
-         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
-        $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()
-
-       
-
-         $getstoreId = Store::whereIn('id', $listdept)->get(); // fix: whereIn + get()
-        $liststock = Stock::whereIn('store_id',$listdept)
-        ->where('status','pending')->get();
-
-  
-     
-        return view('stock.stockEntry',['getItemid'=>$getItemid,'listsup'=>$listsup,'getstoreId'=>$getstoreId,'liststock'=>$liststock]);
+        return $this->buildStockEntryView();
     }
 
 
 
    public function addStock(Request $request)
 {
-    $request->validate([
-        'item' => 'required',
-        'batch_number' => 'nullable',
-        
-        'supplier' => 'required',
-        'waybill' => 'required',
-        'award_letter' => 'required',
-        'amount' => 'required',
-        'store_id' => 'required',
-        'quantity' => 'required',
-        'bar_code' => 'nullable',
-        'expiry_date' => ['required_unless:store_id,2', 'nullable', 'date'],
-    ]);
+    $rules = [
+        'item' => 'required|exists:items,id',
+        'batch_number' => 'nullable|string|max:255',
+        'supplier' => 'required|exists:suppliers,id',
+        'waybill' => 'required|string|max:255',
+        'award_letter' => 'required|string|max:255',
+        'amount' => 'required|numeric|min:0',
+        'quantity' => 'required|integer|min:1',
+        'bar_code' => 'nullable|string|max:255',
+        'comment' => 'nullable|string',
+        'expiry_date' => ['required_unless:store,2', 'nullable', 'date'],
+    ];
 
-    // ✅ Batch number: use user input OR generate
-    $batchNumber = $request->batch_number 
-        ? $request->batch_number 
-        : 'BN' . rand(10000000, 99999999);
-
-    // ✅ Barcode: use user input OR generate
-    $barcode = $request->bar_code 
-        ? $request->bar_code 
-        : 'SS' . rand(10000000, 99999999);
-
-    // Generate barcode image
-    $barcodeImage = DNS1D::getBarcodePNG($barcode, 'C128');
-
-    // Folder path
-    $folderPath = public_path('barcodes');
-
-    if (!File::exists($folderPath)) {
-        File::makeDirectory($folderPath, 0755, true);
+    if ($this->storeContext->hasGlobalStoreAccess()) {
+        $rules['store'] = 'required|exists:stores,id';
     }
 
-    $imageName = $barcode . '.png';
+    $request->validate($rules);
 
-    file_put_contents(
-        $folderPath . '/' . $imageName,
-        base64_decode($barcodeImage)
-    );
+    $storeId = $this->resolveStoreIdForStockEntry($request);
 
-    // Save stock
+    if ($this->isSatelliteStockContext()) {
+        $batchNumber = $request->batch_number ?: 'BN' . rand(10000000, 99999999);
+        $barcodeAssets = $this->generateBarcodeAssets($request->bar_code);
+
+        SatelliteStockEntry::create([
+            'item_id'            => $request->item,
+            'batch_number'       => $batchNumber,
+            'manufacturing_date' => $request->manufacturing_date,
+            'expiry_date'        => $request->expiry_date,
+            'supplier_id'        => $request->supplier,
+            'purchase_order'     => $request->purchase_order,
+            'waybill'            => $request->waybill,
+            'award_letter'       => $request->award_letter,
+            'amount'             => $request->amount,
+            'store_id'           => $storeId,
+            'comment'            => $request->comment,
+            'qty'                => $request->quantity,
+            'barcode'            => $barcodeAssets['barcode'],
+            'barcode_path'       => $barcodeAssets['barcode_path'],
+            'created_by'         => Auth::id(),
+            'status'             => 'pending',
+        ]);
+
+        $itemName = Item::find($request->item)?->name ?? 'Item';
+        $this->notifications->notifyUsersForAction(
+            NotificationService::TYPE_STOCK_PENDING_APPROVAL,
+            'Stock Entry Pending Approval',
+            "Satellite stock entry for {$itemName} (batch {$batchNumber}) requires approval.",
+            'stockApproval',
+            $batchNumber,
+            (int) $storeId,
+            [Auth::id()]
+        );
+
+        return redirect()->route('stockEntry')
+            ->with('message_success', 'Stock entry submitted for approval. It will be recorded once approved via Stock Approval.');
+    }
+
+    $item = Item::findOrFail($request->item);
+    if ((int) $item->store_id !== $storeId) {
+        return back()->with('message_error', 'Selected item does not belong to this store.')->withInput();
+    }
+
+    $batchNumber = $request->batch_number ?: 'BN' . rand(10000000, 99999999);
+    $barcodeAssets = $this->generateBarcodeAssets($request->bar_code);
+
     $insertCat = new Stock();
     $insertCat->item_id = $request->item;
     $insertCat->batch_number = $batchNumber;
@@ -313,81 +711,123 @@ class StockController extends Controller
     $insertCat->waybill = $request->waybill;
     $insertCat->award_letter = $request->award_letter;
     $insertCat->amount = $request->amount;
-    $insertCat->store_id = $request->store;
+    $insertCat->store_id = $storeId;
     $insertCat->comment = $request->comment;
     $insertCat->qty = $request->quantity;
-
-    $insertCat->barcode = $barcode;
-    $insertCat->barcode_path = 'barcodes/' . $imageName;
-
+    $insertCat->barcode = $barcodeAssets['barcode'];
+    $insertCat->barcode_path = $barcodeAssets['barcode_path'];
     $insertCat->created_by = Auth::id();
+    $insertCat->status = 'pending';
 
-    $status = $insertCat->save();
+    if (!$insertCat->save()) {
+        return redirect()->route('stockEntry')->with('message_error', 'Something went wrong, please try again.')->withInput();
+    }
 
-    return $status
-        ? back()->with('message_success', 'Stock added successfully')
-        : back()->with('message_error', 'Something went wrong, please try again.');
+    if ($this->stockApproval->canApproveStock()) {
+        $this->stockApproval->approve($insertCat->fresh());
+
+        return redirect()->route('stockEntry')->with('message_success', 'Stock entry approved and added to inventory.');
+    }
+
+    $itemName = $item->name ?? 'Item';
+    $this->notifications->notifyUsersForAction(
+        NotificationService::TYPE_STOCK_PENDING_APPROVAL,
+        'Stock Entry Pending Approval',
+        "Stock entry for {$itemName} (batch {$batchNumber}) requires approval.",
+        'stockApproval',
+        $batchNumber,
+        (int) $storeId,
+        [Auth::id()]
+    );
+
+    return redirect()->route('stockEntry')->with('message_success', 'Stock entry submitted for approval. It will be added to inventory once approved by an authorized user.');
 }
 
   public function deleteStockItem(string $id)
     {
-        Stock ::where('id',$id)->delete();
-        
+        if ($this->isSatelliteStockContext()) {
+            $entry = SatelliteStockEntry::findOrFail($id);
+            $this->assertPendingSatelliteStockEntryInScope($entry);
+            $entry->delete();
+        } else {
+            $stock = Stock::findOrFail($id);
+            $this->assertPendingStockInScope($stock);
+            $stock->delete();
+        }
 
-        return redirect('stockEntry')->with('message_success','Item deleted successfully!');
+        return redirect()->route('stockEntry')->with('message_success', 'Pending stock entry deleted successfully.');
     }
 
     //get stock details
       public function getStockID($id)
     {
-         $data = Stock::findOrFail($id);
-          return response()->json($data);
+        if ($this->isSatelliteStockContext()) {
+            $data = SatelliteStockEntry::findOrFail($id);
+            $this->assertPendingSatelliteStockEntryInScope($data);
+        } else {
+            $data = Stock::findOrFail($id);
+        }
+
+        return response()->json($data);
     }
 
     public function updateStock(Request $request)
     {
        $request->validate([
-        'item' => 'required',
-        'batch_number' => 'nullable',
-        'expiry_date' => 'required',
-        'supplier' => 'required',
-        'waybill' => 'required',
-        'award_letter' => 'required',
-        'amount' => 'required',
-        'store' => 'required',
-        'quantity' => 'required',
-        'bar_code' => 'nullable',
+        'stock_id' => 'required|integer',
+        'item' => 'required|exists:items,id',
+        'batch_number' => 'nullable|string|max:255',
+        'expiry_date' => 'nullable|date',
+        'supplier' => 'required|exists:suppliers,id',
+        'waybill' => 'required|string|max:255',
+        'award_letter' => 'required|string|max:255',
+        'amount' => 'required|numeric|min:0',
+        'store' => 'nullable|exists:stores,id',
+        'quantity' => 'required|integer|min:1',
+        'bar_code' => 'nullable|string|max:255',
+        'comment' => 'nullable|string',
     ]);
 
-    // ✅ Batch number: use user input OR generate
-    $batchNumber = $request->batch_number 
-        ? $request->batch_number 
-        : 'BN' . rand(10000000, 99999999);
+    if ($this->isSatelliteStockContext()) {
+        $entry = SatelliteStockEntry::findOrFail($request->stock_id);
+        $this->assertPendingSatelliteStockEntryInScope($entry);
 
-    // ✅ Barcode: use user input OR generate
-    $barcode = $request->bar_code 
-        ? $request->bar_code 
-        : 'SS' . rand(10000000, 99999999);
+        $storeId = $this->resolveStoreIdForStockEntry($request);
+        $batchNumber = $request->batch_number ?: 'BN' . rand(10000000, 99999999);
+        $barcodeAssets = $this->generateBarcodeAssets($request->bar_code);
 
-    // Generate barcode image
-    $barcodeImage = DNS1D::getBarcodePNG($barcode, 'C128');
+        $entry->item_id = $request->item;
+        $entry->batch_number = $batchNumber;
+        $entry->manufacturing_date = $request->manufacturing_date;
+        $entry->expiry_date = $request->expiry_date;
+        $entry->supplier_id = $request->supplier;
+        $entry->purchase_order = $request->purchase_order;
+        $entry->waybill = $request->waybill;
+        $entry->award_letter = $request->award_letter;
+        $entry->amount = $request->amount;
+        $entry->store_id = $storeId;
+        $entry->qty = $request->quantity;
+        $entry->comment = $request->comment;
+        $entry->barcode = $barcodeAssets['barcode'];
+        $entry->barcode_path = $barcodeAssets['barcode_path'];
+        $entry->updated_by = Auth::id();
+        $entry->status = 'pending';
 
-    // Folder path
-    $folderPath = public_path('barcodes');
+        $status = $entry->save();
 
-    if (!File::exists($folderPath)) {
-        File::makeDirectory($folderPath, 0755, true);
+        return $status
+            ? redirect()->route('stockEntry')->with('message_success', 'Pending stock entry updated. It still requires approval before inventory is updated.')
+            : redirect()->route('stockEntry')->with('message_error', 'Something went wrong, please try again.')->withInput();
     }
 
-    $imageName = $barcode . '.png';
+    $insertCat = Stock::findOrFail($request->stock_id);
+    $this->assertPendingStockInScope($insertCat);
 
-    file_put_contents(
-        $folderPath . '/' . $imageName,
-        base64_decode($barcodeImage)
-    );
+    $storeId = $this->resolveStoreIdForStockEntry($request, $insertCat);
 
-    // Save stock
-     $insertCat = Stock::find($request->stock_id);
+    $batchNumber = $request->batch_number ?: 'BN' . rand(10000000, 99999999);
+    $barcodeAssets = $this->generateBarcodeAssets($request->bar_code);
+
     $insertCat->item_id = $request->item;
     $insertCat->batch_number = $batchNumber;
     $insertCat->manufacturing_date = $request->manufacturing_date;
@@ -397,153 +837,368 @@ class StockController extends Controller
     $insertCat->waybill = $request->waybill;
     $insertCat->award_letter = $request->award_letter;
     $insertCat->amount = $request->amount;
-    $insertCat->store_id = $request->store;
+    $insertCat->store_id = $storeId;
     $insertCat->qty = $request->quantity;
     $insertCat->comment = $request->comment;
-
-    $insertCat->barcode = $barcode;
-    $insertCat->barcode_path = 'barcodes/' . $imageName;
-
-    $insertCat->created_by = Auth::id();
+    $insertCat->barcode = $barcodeAssets['barcode'];
+    $insertCat->barcode_path = $barcodeAssets['barcode_path'];
+    $insertCat->updated_by = Auth::id();
+    $insertCat->status = 'pending';
 
     $status = $insertCat->save();
 
+    $message = $this->stockApproval->canApproveStock()
+        ? 'Pending stock entry updated successfully.'
+        : 'Pending stock entry updated. It still requires approval before inventory is updated.';
+
     return $status
-        ? back()->with('message_success', 'Stock updated successfully')
-        : back()->with('message_error', 'Something went wrong, please try again.');
+        ? redirect()->route('stockEntry')->with('message_success', $message)
+        : redirect()->route('stockEntry')->with('message_error', 'Something went wrong, please try again.')->withInput();
    }
 
    public function getstockApprovalView()
    {
-    
-     $liststock = Stock::select('store_id')
-        ->where('status', 'pending')
-        ->groupBy('store_id')
-        ->orderBy('store_id')
+    $this->assertCanApproveStock();
+
+    $scopedStoreIds = $this->storeContext->getScopedStoreIds();
+
+    $satelliteStoreIds = Store::whereIn('id', $scopedStoreIds)
+        ->where('store_group', 'satellite')
+        ->pluck('id');
+    $centralStoreIds = Store::whereIn('id', $scopedStoreIds)
+        ->where('store_group', '!=', 'satellite')
+        ->pluck('id');
+
+    $pendingStocks = Stock::where('status', 'pending')
+        ->when($centralStoreIds->isNotEmpty(), fn ($q) => $q->whereIn('store_id', $centralStoreIds), fn ($q) => $q->whereRaw('1 = 0'))
         ->get();
 
-    return view('stock.stockApproval', compact('liststock'));
+    $pendingSatelliteEntries = SatelliteStockEntry::where('status', 'pending')
+        ->when($satelliteStoreIds->isNotEmpty(), fn ($q) => $q->whereIn('store_id', $satelliteStoreIds), fn ($q) => $q->whereRaw('1 = 0'))
+        ->get();
+
+    $pendingStoreIds = $pendingStocks->pluck('store_id')
+        ->merge($pendingSatelliteEntries->pluck('store_id'))
+        ->unique()
+        ->values();
+
+    $liststock = Store::whereIn('id', $pendingStoreIds)
+        ->orderBy('name')
+        ->get()
+        ->map(function (Store $store) {
+            if ($store->store_group === 'satellite') {
+                $rows = SatelliteStockEntry::where('store_id', $store->id)->where('status', 'pending')->get();
+            } else {
+                $rows = Stock::where('store_id', $store->id)->where('status', 'pending')->get();
+            }
+
+            $store->pending_count = $rows->count();
+            $store->pending_qty = (int) $rows->sum('qty');
+            $store->pending_value = $rows->sum(fn ($s) => (float) ($s->qty ?? 0) * (float) ($s->amount ?? 0));
+            $store->pending_avg_price = $store->pending_qty > 0
+                ? round($store->pending_value / $store->pending_qty, 2)
+                : 0;
+
+            return $store;
+        });
+
+    $pendingCount = $pendingStocks->count() + $pendingSatelliteEntries->count();
+    $storeCount = $liststock->count();
+    $totalQty = (int) $pendingStocks->sum('qty') + (int) $pendingSatelliteEntries->sum('qty');
+    $totalValue = $pendingStocks->sum(fn ($s) => (float) ($s->qty ?? 0) * (float) ($s->amount ?? 0))
+        + $pendingSatelliteEntries->sum(fn ($s) => (float) ($s->qty ?? 0) * (float) ($s->amount ?? 0));
+    $topStore = $liststock->sortByDesc('pending_count')->first();
+    $topStorePct = ($pendingCount > 0 && $topStore)
+        ? round(($topStore->pending_count / $pendingCount) * 100)
+        : 0;
+
+    return view('stock.stockApproval', compact(
+        'liststock',
+        'pendingCount',
+        'storeCount',
+        'totalQty',
+        'totalValue',
+        'topStore',
+        'topStorePct',
+    ));
    }
 
     public function ApproveStock($id)
     {
-        
+    $this->assertCanApproveStock();
 
-      // Logged in user's store
-    
+    if (request()->query('source') === 'satellite') {
+        $entry = SatelliteStockEntry::where('id', $id)->where('status', 'pending')->firstOrFail();
 
-    // Get selected pending stock
-    $stocks = Stock::where('id', $id)
-                    ->where('status', 'pending')
-                    
-                    ->get();
-    foreach ($stocks as $stock) {
+        if (!in_array((int) $entry->store_id, $this->storeContext->getScopedStoreIds(), true)) {
+            abort(403, 'You cannot approve stock for this store.');
+        }
 
-        ApproveStock::create([
-            'stock_id'        => $stock->id,
-            'item_id'         => $stock->item_id,
-            'batch_number'    => $stock->batch_number,
-            'expiry_date'     =>  $stock->expiry_date,
-            'qty'             => $stock->qty,
-            'amount'          => $stock->amount,
-            'purchase_order'  => $stock->purchase_order,
-            'supplier_id'     => $stock->supplier_id,
-            'store_id'        => $stock->store_id,
-            'created_by'      =>  Auth::id(),
-            'status'          => 'approved',
-        ]);
+        if (!$this->stockApproval->approveSatelliteEntry($entry)) {
+            return back()->with('message_error', 'Unable to approve this stock entry.');
+        }
 
-        // Update original stock table
-        Stock::where('id', $stock->id)
-            ->update([
-                'status' => 'approved'
-            ]);
+        return back()->with('message_success', 'Stock approved and recorded in satellite inventory.');
     }
 
-   
-        
+    $stock = Stock::where('id', $id)->where('status', 'pending')->firstOrFail();
 
-        return back()->with('message_success', 'Stock Approved Successfully');
+    if (!in_array((int) $stock->store_id, $this->storeContext->getScopedStoreIds(), true)) {
+        abort(403, 'You cannot approve stock for this store.');
+    }
+
+    if (!$this->stockApproval->approve($stock)) {
+        return back()->with('message_error', 'Unable to approve this stock entry.');
+    }
+
+        return back()->with('message_success', 'Stock approved and added to inventory.');
+    }
+
+    public function rejectStock(Request $request, $id)
+    {
+        $this->assertCanApproveStock();
+
+        $request->validate([
+            'reason' => 'required|string|min:3|max:2000',
+        ]);
+
+        if ($request->query('source') === 'satellite') {
+            $entry = SatelliteStockEntry::where('id', $id)->where('status', 'pending')->firstOrFail();
+
+            if (!in_array((int) $entry->store_id, $this->storeContext->getScopedStoreIds(), true)) {
+                abort(403, 'You cannot reject stock for this store.');
+            }
+
+            if (!$this->stockApproval->rejectSatelliteEntry($entry, $request->reason)) {
+                return back()->with('message_error', 'Unable to reject this stock entry.');
+            }
+
+            return back()->with('message_success', 'Stock entry rejected successfully.');
+        }
+
+        $stock = Stock::where('id', $id)->where('status', 'pending')->firstOrFail();
+
+        if (!in_array((int) $stock->store_id, $this->storeContext->getScopedStoreIds(), true)) {
+            abort(403, 'You cannot reject stock for this store.');
+        }
+
+        if (!$this->stockApproval->reject($stock, $request->reason)) {
+            return back()->with('message_error', 'Unable to reject this stock entry.');
+        }
+
+        return back()->with('message_success', 'Stock entry rejected successfully.');
+    }
+
+    public function rejectAll(Request $request, $store_id)
+    {
+        $this->assertCanApproveStock();
+
+        $request->validate([
+            'reason' => 'required|string|min:3|max:2000',
+        ]);
+
+        $storeId = (int) $store_id;
+
+        if (!in_array($storeId, $this->storeContext->getScopedStoreIds(), true)) {
+            abort(403, 'You cannot reject stock for this store.');
+        }
+
+        $store = Store::findOrFail($storeId);
+
+        if ($store->store_group === 'satellite') {
+            $entries = SatelliteStockEntry::where('status', 'pending')->where('store_id', $storeId)->get();
+            $rejected = $this->stockApproval->rejectManySatelliteEntries($entries, $request->reason);
+        } else {
+            $stocks = Stock::where('status', 'pending')->where('store_id', $storeId)->get();
+            $rejected = $this->stockApproval->rejectMany($stocks, $request->reason);
+        }
+
+        if ($rejected === 0) {
+            return back()->with('message_error', 'No pending stock entries were rejected.');
+        }
+
+        return redirect()->route('stockApproval')->with(
+            'message_success',
+            "{$rejected} pending stock " . ($rejected === 1 ? 'entry' : 'entries') . ' rejected successfully.'
+        );
     }
 
       public function approveAll($store_id)
     {
-    
-    // Get only pending stock for that store
-    $stocks = Stock::where('status', 'pending')
-                    ->where('store_id', $store_id)
-                    ->get();
+    $this->assertCanApproveStock();
 
-    foreach ($stocks as $stock) {
+    $storeId = (int) $store_id;
 
-        ApproveStock::create([
-            'stock_id'        => $stock->id,
-            'item_id'         => $stock->item_id,
-            'batch_number'    => $stock->batch_number,
-            'expiry_date'     => $stock->expiry_date,
-            'qty'             => $stock->qty,
-            'amount'          => $stock->amount,
-            'purchase_order'  => $stock->purchase_order,
-            'supplier_id'     => $stock->supplier_id,
-            'store_id'        => $stock->store_id,
-            'created_by'      =>  Auth::id(),
-            'status'          => 'approved',
-        ]);
-
-        // Update original stock table
-        Stock::where('id', $stock->id)
-            ->update([
-                'status' => 'approved'
-            ]);
+    if (!in_array($storeId, $this->storeContext->getScopedStoreIds(), true)) {
+        abort(403, 'You cannot approve stock for this store.');
     }
 
-    return  redirect()->route('stockApproval')->with('message_success', 'All pending stock approved successfully');
+    $store = Store::findOrFail($storeId);
+
+    if ($store->store_group === 'satellite') {
+        $entries = SatelliteStockEntry::where('status', 'pending')->where('store_id', $storeId)->get();
+        $approved = $this->stockApproval->approveManySatelliteEntries($entries);
+    } else {
+        $stocks = Stock::where('status', 'pending')->where('store_id', $storeId)->get();
+        $approved = $this->stockApproval->approveMany($stocks);
+    }
+
+    if ($approved === 0) {
+        return redirect()->route('stockApproval')->with('message_error', 'No pending stock entries were approved.');
+    }
+
+    return redirect()->route('stockApproval')->with('message_success', "{$approved} pending stock " . ($approved === 1 ? 'entry' : 'entries') . ' approved successfully.');
    }
 
    public function getpendingStockView()
     {
-        $listsup = Supplier::all();
-         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
-        $getItemid = Item::whereIn('store_id', $listdept)
-         ->where('status','Active')
-        ->get(); // fix: whereIn + get()
+        $scopedStoreIds = $this->storeContext->getScopedStoreIds();
 
-       
+        if (empty($scopedStoreIds)) {
+            return redirect()->route('choose-store')
+                ->with('message_error', 'Select a store to view pending stock.');
+        }
 
-         $getstoreId = Store::whereIn('id', $listdept)->get(); // fix: whereIn + get()
-        $liststock = Stock::whereIn('store_id',$listdept)
-        ->where('status','pending')->get();
+        $listsup = Supplier::where('status', 'Active')->orderBy('company')->get();
+        $getItemid = Item::whereIn('store_id', $scopedStoreIds)
+            ->where('status', 'Active')
+            ->orderBy('name')
+            ->get();
+        $getstoreId = Store::whereIn('id', $scopedStoreIds)->orderBy('name')->get();
 
-  
-     
-        return view('stock.pendingStock',['getItemid'=>$getItemid,'listsup'=>$listsup,'getstoreId'=>$getstoreId,'liststock'=>$liststock]);
+        $liststock = Stock::with(['itemcode', 'itemname', 'supname', 'storename'])
+            ->whereIn('store_id', $scopedStoreIds)
+            ->where('status', 'pending')
+            ->orderByDesc('created_at')
+            ->get();
+
+        $pendingCount = $liststock->count();
+        $totalQty = (int) $liststock->sum('qty');
+        $totalValue = $liststock->sum(fn ($s) => (float) ($s->qty ?? 0) * (float) ($s->amount ?? 0));
+        $uniqueItems = $liststock->pluck('item_id')->unique()->count();
+        $uniquePct = $pendingCount > 0 ? min(100, (int) round(($uniqueItems / $pendingCount) * 100)) : 0;
+
+        $storeBreakdown = $liststock->groupBy('store_id')->map(function ($rows, $storeId) {
+            return [
+                'name' => optional($rows->first()->storename)->name ?? 'Store #' . $storeId,
+                'count' => $rows->count(),
+            ];
+        });
+
+        return view('stock.pendingStock', [
+            'getItemid' => $getItemid,
+            'listsup' => $listsup,
+            'getstoreId' => $getstoreId,
+            'liststock' => $liststock,
+            'pendingCount' => $pendingCount,
+            'totalQty' => $totalQty,
+            'totalValue' => $totalValue,
+            'uniqueItems' => $uniqueItems,
+            'uniquePct' => $uniquePct,
+            'storeBreakdown' => $storeBreakdown,
+            'requiresApproval' => $this->stockApproval->requiresApproval(),
+        ]);
     }
 
     public function getapprovedStockView()
     {
-        
-         $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
-        $liststock = Stock::whereIn('store_id',$listdept)
-        ->where('status','approved')->get();
-        return view('stock.approvedStock',[ 'liststock'=>$liststock]);
+        $scopedStoreIds = $this->storeContext->getScopedStoreIds();
+
+        if (empty($scopedStoreIds)) {
+            return redirect()->route('choose-store')
+                ->with('message_error', 'Select a store to view approved stock.');
+        }
+
+        $isSatelliteStore = $this->isSatelliteStockContext();
+
+        if ($isSatelliteStore) {
+            $liststock = SatelliteStockReceipt::with(['itemcode', 'itemname', 'supname', 'storename', 'staffname'])
+                ->whereIn('store_id', $scopedStoreIds)
+                ->orderByDesc('received_at')
+                ->get();
+        } else {
+            $liststock = ApproveStock::with(['itemcode', 'itemname', 'supname', 'storename', 'staffname'])
+                ->whereIn('store_id', $scopedStoreIds)
+                ->where('status', 'approved')
+                ->orderByDesc('created_at')
+                ->get();
+        }
+
+        $approvedCount = $liststock->count();
+        $totalQty = (int) $liststock->sum('qty');
+        $totalValue = $liststock->sum(fn ($s) => (float) ($s->qty ?? 0) * (float) ($s->amount ?? 0));
+        $uniqueItems = $liststock->pluck('item_id')->unique()->count();
+        $uniquePct = $approvedCount > 0 ? min(100, (int) round(($uniqueItems / $approvedCount) * 100)) : 0;
+
+        $storeBreakdown = $liststock->groupBy('store_id')->map(function ($rows, $storeId) {
+            return [
+                'name' => optional($rows->first()->storename)->name ?? 'Store #' . $storeId,
+                'count' => $rows->count(),
+            ];
+        });
+
+        $expiringSoon = $liststock->filter(function ($row) {
+            if (empty($row->expiry_date)) {
+                return false;
+            }
+
+            return Carbon::parse($row->expiry_date)->lte(now()->addMonths(3));
+        })->count();
+
+        return view('stock.approvedStock', [
+            'liststock' => $liststock,
+            'approvedCount' => $approvedCount,
+            'totalQty' => $totalQty,
+            'totalValue' => $totalValue,
+            'uniqueItems' => $uniqueItems,
+            'uniquePct' => $uniquePct,
+            'storeBreakdown' => $storeBreakdown,
+            'expiringSoon' => $expiringSoon,
+            'isSatelliteStore' => $isSatelliteStore,
+        ]);
     }
 
     public function getIssueItemView()
     {
-        $listdept = array_map('intval', explode('~', Auth::user()->department_id));
+        $storeIds = $this->storeContext->getScopedStoreIds();
 
-        $listrequest = ItemRequest::where('item_store_id', $listdept)
-            ->whereIn('id', function ($query) use ($listdept) {
-                $query->selectRaw('MAX(id)')
-                    ->from('item_requests')
-                    ->where('item_store_id', $listdept)
-                    ->where('status','request approved')
-                    ->groupBy('requisition_no');
-            })
-            ->orderBy('id', 'DESC')
+        if (empty($storeIds)) {
+            return redirect()->route('choose-store');
+        }
+
+        if ($user = auth()->user()) {
+            $this->notifications->syncStaleNotificationsForUser($user);
+        }
+
+        $approvedRequests = ItemRequest::with(['storename', 'staffname', 'itemname'])
+            ->whereIn('item_store_id', $storeIds)
+            ->where('status', 'request approved')
+            ->orderByDesc('created_at')
             ->get();
-        
-                return view('stock.IssueItem', ['listrequest'=>$listrequest ]);
+
+        $requisitions = $approvedRequests->groupBy('requisition_no')->map(function ($lines) {
+            $first = $lines->first();
+
+            return (object) [
+                'requisition_no'      => $first->requisition_no,
+                'requesting_store'    => $first->storename,
+                'requested_by'        => $first->staffname,
+                'line_count'          => $lines->count(),
+                'total_qty_requested' => (int) $lines->sum('qty_requested'),
+                'total_qty_approved'  => (int) $lines->sum(fn ($line) => $line->qty ?? $line->qty_requested),
+                'submitted_at'        => $lines->min('created_at'),
+            ];
+        })->values();
+
+        $activeStore = $this->storeContext->getActiveStore();
+
+        return view('stock.IssueItem', [
+            'requisitions'      => $requisitions,
+            'activeStore'       => $activeStore,
+            'totalRequisitions' => $requisitions->count(),
+            'totalLineItems'    => $approvedRequests->count(),
+            'totalQty'          => (int) $approvedRequests->sum(fn ($row) => $row->qty ?? $row->qty_requested),
+        ]);
     }
 
     
@@ -551,37 +1206,26 @@ class StockController extends Controller
     {
         $getID = $request->getID;
 
-        $item = DB::table('items')->where('id', $getID)->first();
+        $item = DB::table('items')
+            ->leftJoin('unit_of_measures', 'items.unit_id', '=', 'unit_of_measures.id')
+            ->where('items.id', $getID)
+            ->select('items.*', 'unit_of_measures.name as uom_name')
+            ->first();
 
         if (!$item) {
             return response()->json([
-                'batch_number' => null,
-                'message_error' => 'Item not found'
+                'batch_number'  => null,
+                'message_error' => 'Item not found',
             ]);
         }
 
-        $itemExists = DB::table('approve_stocks')
+        $stock = DB::table('approve_stocks')
             ->where('item_id', $getID)
-            ->exists();
-
-        if (!$itemExists) {
-            return response()->json([
-                'batch_number' => null,
-                'item_name'    => $item->name,
-                'message_error' => 'No quantity for ' . $item->name
-            ]);
-        }
-
-       $stock = DB::table('approve_stocks')
-        ->join('items', 'approve_stocks.item_id', '=', 'items.id')
-        ->join('unit_of_measures', 'items.unit_id', '=', 'unit_of_measures.id')
-        ->where('approve_stocks.item_id', $getID)
-        ->where('approve_stocks.qty', '>', 0)
-        ->where('approve_stocks.status', 'approved')
-        ->whereDate('approve_stocks.expiry_date', '>=', now())
-        ->orderBy('approve_stocks.expiry_date', 'ASC')
-        ->select('approve_stocks.*', 'unit_of_measures.name as uom_name', 'items.unit_id')
-        ->first();
+            ->where('qty', '>', 0)
+            ->where('status', 'approved')
+            ->whereDate('expiry_date', '>=', now())
+            ->orderBy('expiry_date', 'ASC')
+            ->first();
 
         if ($stock) {
             return response()->json([
@@ -591,15 +1235,16 @@ class StockController extends Controller
                 'stock_id'     => $stock->stock_id,
                 'qty'          => $stock->qty,
                 'expiry_date'  => $stock->expiry_date,
-                'unit_id'      => $stock->unit_id,
-                'uom_name'     => $stock->uom_name
+                'uom_name'     => $item->uom_name,
             ]);
         }
 
         return response()->json([
-            'batch_number' => null,
-            'item_name'    => $item->name,
-            'message'      => 'No stock available for ' . $item->name
+            'batch_number'  => null,
+            'item_name'     => $item->name,
+            'uom_name'      => $item->uom_name,
+            'qty'           => 0,
+            'message_error' => 'No stock available for ' . $item->name,
         ]);
     }
 
@@ -653,6 +1298,8 @@ class StockController extends Controller
             'issue_to'       => $request->store,
             'store_id'       => $stock->store_id,
             'created_by'     => Auth::id(),
+            'status'         => 'pending',
+            'status_two'     => 'pending',
         ]);
 
     }
@@ -697,22 +1344,38 @@ class StockController extends Controller
 
    public function getIssueApproval()
    {
+        $storeIds = $this->storeContext->getScopedStoreIds();
 
-   $listdept = array_map('intval', explode('~', Auth::user()->department_id));
+        if (empty($storeIds)) {
+            return redirect()->route('choose-store');
+        }
 
-    $listissues= ItemIssue::whereIn('store_id', $listdept)
-        ->whereIn('id', function ($query) use ($listdept) {
-            $query->selectRaw('MAX(id)')
-                ->from('item_issues')
-                ->whereIn('store_id', $listdept)
-                ->where('status', 'pending')
-                ->groupBy('requisition_no');
-        })
-        ->orderBy('id', 'DESC')
-        ->get();
+        $pendingIssues = ItemIssue::with(['staffname', 'storename', 'itemname'])
+            ->whereIn('store_id', $storeIds)
+            ->where('status', 'pending')
+            ->orderByDesc('created_at')
+            ->get();
 
-    return view('stock.IssueApproval', ['listissues' => $listissues]);
-    
+        $requisitions = $pendingIssues->groupBy('requisition_no')->map(function ($lines) {
+            $first = $lines->first();
+
+            return (object) [
+                'requisition_no'   => $first->requisition_no,
+                'requesting_store' => $first->storename,
+                'issued_by'        => $first->staffname,
+                'line_count'       => $lines->count(),
+                'total_qty'        => (int) $lines->sum('qty'),
+                'submitted_at'     => $lines->min('created_at'),
+            ];
+        })->values();
+
+        return view('stock.IssueApproval', [
+            'requisitions'      => $requisitions,
+            'activeStore'       => $this->storeContext->getActiveStore(),
+            'totalRequisitions' => $requisitions->count(),
+            'totalLineItems'    => $pendingIssues->count(),
+            'totalQty'          => (int) $pendingIssues->sum('qty'),
+        ]);
    }
 
         public function searchIssues(Request $request)
@@ -721,37 +1384,44 @@ class StockController extends Controller
             'department' => 'required',
         ]);
 
-       
-        // All stores
         $liststores = Store::all();
 
-        // Search issues
-        $listissues = ItemIssue::where('status', 'pending')
-                       
-                        ->where('issue_to', $request->department)
-                        ->get();
+        $pendingIssues = ItemIssue::with(['staffname', 'storename', 'itemname'])
+            ->where('status', 'pending')
+            ->where('issue_to', $request->department)
+            ->orderByDesc('created_at')
+            ->get();
 
-        if ($listissues->count() > 0) {
+        $requisitions = $pendingIssues->groupBy('requisition_no')->map(function ($lines) {
+            $first = $lines->first();
 
-            return view(
-                'stock.IssueApproval',
-                compact('listissues', 'liststores'  )
-            )->with(
-                'message_success',
-                $listissues->count().' issue(s) found'
-            );
+            return (object) [
+                'requisition_no'   => $first->requisition_no,
+                'requesting_store' => $first->storename,
+                'issued_by'        => $first->staffname,
+                'line_count'       => $lines->count(),
+                'total_qty'        => (int) $lines->sum('qty'),
+                'submitted_at'     => $lines->min('created_at'),
+            ];
+        })->values();
 
-        } else {
+        $viewData = [
+            'requisitions'      => $requisitions,
+            'activeStore'       => $this->storeContext->getActiveStore(),
+            'totalRequisitions' => $requisitions->count(),
+            'totalLineItems'    => $pendingIssues->count(),
+            'totalQty'          => (int) $pendingIssues->sum('qty'),
+            'liststores'        => $liststores,
+        ];
 
-            return view(
-                'stock.IssueApproval',
-                compact('listissues', 'liststores')
-            )->with(
-                'message_error',
-                'No issues found'
-            );
+        if ($pendingIssues->count() > 0) {
+            return view('stock.IssueApproval', $viewData)
+                ->with('message_success', $pendingIssues->count() . ' issue(s) found');
         }
-    }
+
+        return view('stock.IssueApproval', $viewData)
+            ->with('message_error', 'No issues found');
+        }
  
 
     public function ApproveIssueIndv(Request $request)
@@ -761,6 +1431,8 @@ class StockController extends Controller
         ]);
     $invoiceNo = 'INV-' . date('YmdHis') . '-' . strtoupper(Str::random(6));
         $lastInvoice = null;
+        $notifiedStores = [];
+        $processedRequisitions = [];
         
 
         foreach ($request->issue_id as $issueId) {
@@ -771,7 +1443,13 @@ class StockController extends Controller
 
             if (!$issue) continue;
 
-            $approvedQty = $request->qty[$issueId];
+            $processedRequisitions[$issue->requisition_no] = true;
+
+            $approvedQty = (int) ($request->qty[$issueId] ?? 0);
+
+            if ($approvedQty <= 0) {
+                continue;
+            }
 
             $stock = ApproveStock::where('item_id', $issue->item_id)
                 ->where('batch_number', $issue->batch_number)
@@ -795,15 +1473,48 @@ class StockController extends Controller
             $issue->invoice_number = $invoiceNo;
             $issue->issued_by = Auth::id();
             $issue->status = 'issued';
+            $issue->status_two = 'issued';
             $issue->save();
+
+            if ($issue->item_request_id) {
+                $totalIssued = (int) ItemIssue::where('item_request_id', $issue->item_request_id)
+                    ->where('status', 'issued')
+                    ->sum('qty');
+
+                ItemRequest::where('id', $issue->item_request_id)->update([
+                    'qty_issued' => $totalIssued,
+                    'status'     => 'issued',
+                ]);
+            } else {
+                ItemRequest::where('requisition_no', $issue->requisition_no)
+                    ->where('item_id', $issue->item_id)
+                    ->where('store_id', $issue->issue_to)
+                    ->update(['status' => 'issued']);
+            }
 
             $lastInvoice = $invoiceNo;
 
-            $itemRequests = ItemRequest::where('requisition_no',$issue->requisition_no)
-          
-            ->update([
-                'status' => 'issued'
-            ]);
+            $satelliteStoreId = (int) $issue->issue_to;
+            if ($satelliteStoreId && !isset($notifiedStores[$satelliteStoreId])) {
+                $storeName = Store::find($satelliteStoreId)?->name ?? 'satellite store';
+                $this->notifications->notifyUsersForAction(
+                    NotificationService::TYPE_ISSUE_APPROVED,
+                    'Stock Issued — Receive Required',
+                    "Items have been issued to {$storeName}. Please receive stock into inventory.",
+                    'ReceiveStock',
+                    $issue->requisition_no,
+                    $satelliteStoreId,
+                    [Auth::id()]
+                );
+                $notifiedStores[$satelliteStoreId] = true;
+            }
+        }
+
+        foreach (array_keys($processedRequisitions) as $requisitionNo) {
+            $this->notifications->resolveIfComplete(
+                NotificationService::TYPE_ISSUE_PENDING_APPROVAL,
+                $requisitionNo
+            );
         }
 
         return redirect()->route('IssueApproval')
@@ -827,23 +1538,114 @@ class StockController extends Controller
     public function addBulkupload(Request $request)
     {
         $request->validate([
-        'file' => 'required'
-    ]);
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+        ]);
 
-    $import = new ItemsImport();
+        $uploadedFile = $request->file('file');
+        $readerType = $this->resolveImportReaderType($uploadedFile);
 
-    $import->import($request->file('file'));
+        if (!$readerType) {
+            return back()->with(
+                'message_error',
+                'Could not detect the file type. Please upload a valid .xlsx, .xls, or .csv spreadsheet.'
+            );
+        }
 
-    return back()->with(
-        'message_success',
-        'Items imported successfully'
-    );
+        $import = new ItemsImport(
+            defaultStoreId: $this->resolveBulkUploadStoreId(),
+            createdBy: Auth::id(),
+        );
+
+        try {
+            Excel::import($import, $uploadedFile, null, $readerType);
+        } catch (NoTypeDetectedException $e) {
+            return back()->with(
+                'message_error',
+                'Unable to read the uploaded file. Save it as .xlsx, .xls, or .csv and try again.'
+            );
+        }
+
+        if ($import->importedCount === 0) {
+            $details = collect($import->skipReasons)
+                ->map(fn ($count, $reason) => $count . ' ' . $reason)
+                ->implode('; ');
+
+            return back()->with(
+                'message_error',
+                'No items were imported.'
+                . ($details ? ' Reasons: ' . $details . '.' : '')
+                . ' Headers: name, category_id (or category name), unit_id (or unit name), status.'
+                . ' Add store_id if you are a global admin without an active store.'
+            );
+        }
+
+        $message = $import->importedCount . ' item(s) imported successfully';
+
+        if ($import->skippedCount > 0) {
+            $message .= ' (' . $import->skippedCount . ' row(s) skipped as empty, duplicate, or missing store)';
+        }
+
+        return redirect()->route('Item')->with(
+            'message_success',
+            $message
+        );
+    }
+
+    protected function resolveBulkUploadStoreId(): ?int
+    {
+        if ($this->storeContext->hasGlobalStoreAccess()) {
+            return $this->storeContext->getActiveStoreId();
+        }
+
+        $activeStoreId = $this->storeContext->getActiveStoreId();
+
+        if ($activeStoreId) {
+            return $activeStoreId;
+        }
+
+        $scopedStoreIds = $this->storeContext->getScopedStoreIds();
+
+        return $scopedStoreIds[0] ?? null;
+    }
+
+    protected function resolveImportReaderType(UploadedFile $file): ?string
+    {
+        $extension = strtolower($file->getClientOriginalExtension() ?: $file->guessExtension() ?: '');
+
+        $byExtension = [
+            'xlsx' => ExcelFormat::XLSX,
+            'xlsm' => ExcelFormat::XLSX,
+            'xltx' => ExcelFormat::XLSX,
+            'xls'  => ExcelFormat::XLS,
+            'xlt'  => ExcelFormat::XLS,
+            'csv'  => ExcelFormat::CSV,
+            'txt'  => ExcelFormat::CSV,
+        ];
+
+        if (isset($byExtension[$extension])) {
+            return $byExtension[$extension];
+        }
+
+        $byMime = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => ExcelFormat::XLSX,
+            'application/vnd.ms-excel' => ExcelFormat::XLS,
+            'text/csv' => ExcelFormat::CSV,
+            'text/plain' => ExcelFormat::CSV,
+            'application/csv' => ExcelFormat::CSV,
+            'application/octet-stream' => ExcelFormat::XLSX,
+        ];
+
+        return $byMime[$file->getMimeType()] ?? null;
     }
 
      public function getIssueItemID($id)
     {
-         $data = ItemIssue::findOrFail($id);
-          return response()->json($data);
+        $data = ItemIssue::with('itemname')->findOrFail($id);
+
+        return response()->json([
+            'id'   => $data->id,
+            'name' => $data->itemname->name ?? 'Item',
+        ]);
     }
 
      public function addItemRejection(Request $request)
@@ -862,65 +1664,79 @@ class StockController extends Controller
              
             $status = $insertCat->save();
 
+            if ($status && $insertCat->requisition_no) {
+                $this->notifications->resolveIfComplete(
+                    NotificationService::TYPE_ISSUE_PENDING_APPROVAL,
+                    $insertCat->requisition_no
+                );
+            }
+
             return $status ? back()->with('message_success','Item has been rejected successfully') : back()->with('message_error','Something went wrong, please try again.');
     }
 
-     public function getviewStockEntry()
+     public function getviewStockEntry($store_id)
    {
-     // Get department IDs from user
-    $departmentIds = Auth::user()->department_id;
-    
-    // Convert to array if it's a string with ~ separator
-    if (is_string($departmentIds) && strpos($departmentIds, '~') !== false) {
-        $listdept = array_map('intval', explode('~', $departmentIds));
+    $this->assertCanApproveStock();
+
+    try {
+        $storeId = (int) Crypt::decrypt($store_id);
+    } catch (\Throwable $e) {
+        abort(404);
+    }
+
+    if (!in_array($storeId, $this->storeContext->getScopedStoreIds(), true)) {
+        abort(403, 'You cannot review stock for this store.');
+    }
+
+    $store = Store::findOrFail($storeId);
+    $isSatelliteStore = $store->store_group === 'satellite';
+
+    if ($isSatelliteStore) {
+        $liststock = SatelliteStockEntry::with(['itemcode', 'itemname', 'supname', 'staffname'])
+            ->where('store_id', $storeId)
+            ->where('status', 'pending')
+            ->orderByDesc('created_at')
+            ->get();
     } else {
-        // If it's already an array or single value
-        $listdept = is_array($departmentIds) ? $departmentIds : [$departmentIds];
+        $liststock = Stock::with(['itemcode', 'itemname', 'supname', 'staffname'])
+            ->where('store_id', $storeId)
+            ->where('status', 'pending')
+            ->orderByDesc('created_at')
+            ->get();
     }
-    
-    // Filter out empty or invalid values
-    $listdept = array_filter($listdept);
-    
-    // If no departments, return empty view
-    if (empty($listdept)) {
-        return view('stock.viewStockEntry', ['liststock' => collect()]);
-    }
-    
-    // Get pending stocks for the departments
-    $liststock = Stock::whereIn('store_id', $listdept)
-        ->where('status', 'pending')
-        
-        ->orderBy('created_at', 'DESC')
-        ->get();
-    
-    // If you need to group by store_id, do it in the view or use a collection
-    // Option 1: Group in the view (recommended)
-    // $groupedStock = $liststock->groupBy('store_id');
-    
+
+    $pendingCount = $liststock->count();
+    $totalQty = (int) $liststock->sum('qty');
+    $totalValue = $liststock->sum(fn ($s) => (float) ($s->qty ?? 0) * (float) ($s->amount ?? 0));
+    $uniqueItems = $liststock->pluck('item_id')->unique()->count();
+
     return view('stock.viewStockEntry', [
         'liststock' => $liststock,
-        // 'groupedStock' => $groupedStock // If you want grouped data
+        'store' => $store,
+        'storeId' => $storeId,
+        'isSatelliteStore' => $isSatelliteStore,
+        'canApproveStock' => $this->stockApproval->canApproveStock(),
+        'pendingCount' => $pendingCount,
+        'totalQty' => $totalQty,
+        'totalValue' => $totalValue,
+        'uniqueItems' => $uniqueItems,
     ]);
    }
-<<<<<<< HEAD
 
-   public function getItemUom(Request $request)
-{
-    $item = DB::table('items')
-        ->join('unit_of_measures', 'items.unit_id', '=', 'unit_of_measures.id')
-        ->where('items.id', $request->item_id)
-        ->select('items.name as item_name', 'unit_of_measures.name as uom_name')
-        ->first();
+    public function getItemUom(Request $request)
+    {
+        $item = DB::table('items')
+            ->join('unit_of_measures', 'items.unit_id', '=', 'unit_of_measures.id')
+            ->where('items.id', $request->item_id)
+            ->select('items.name as item_name', 'unit_of_measures.name as uom_name')
+            ->first();
 
-    if (!$item) {
-        return response()->json(['uom_name' => null]);
+        if (!$item) {
+            return response()->json(['uom_name' => null]);
+        }
+
+        return response()->json([
+            'uom_name' => $item->uom_name,
+        ]);
     }
-
-    return response()->json([
-        'uom_name' => $item->uom_name
-    ]);
-}
-=======
->>>>>>> 3b001aeea4c5ceae9e7bb892e0440c524eabe236
-    
 }

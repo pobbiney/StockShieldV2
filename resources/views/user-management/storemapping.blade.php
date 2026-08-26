@@ -46,6 +46,13 @@
                 </div>
                 
                 <div class="card-body">
+
+                    @if (session('message_success'))
+                        <div class="alert alert-success">{{ session('message_success') }}</div>
+                    @endif
+                    @if (session('message_error'))
+                        <div class="alert alert-danger">{{ session('message_error') }}</div>
+                    @endif
                    
                     <form id="formValidationExamples" class="row g-6" action="{{route('map-store-process')}}" method="POST">
                      @csrf
@@ -54,7 +61,7 @@
                            <div class="col-md-6">
                                <div class="form-group mb-3 position-relative check-valid">
                                     <div class="form-floating">
-                                         <select   name="staff_id" class="form-select select2" data-allow-clear="true">
+                                         <select id="staffSelect" name="staff_id" class="form-select select2" data-allow-clear="true">
                                             <option value="" selected disabled>-- SELECT STAFF --</option>
                                             @foreach ($liststaff as $list)
                                                 <option value="{{ $list->staff_id }}"
@@ -68,16 +75,24 @@
                                    </div>
                                </div>
                            </div>
+                           <div class="col-md-6">
+                               <div id="staffRoleInfo" class="alert alert-info d-none mb-0">
+                                   <strong>Role:</strong> <span id="staffRoleName"></span>
+                               </div>
+                           </div>
                           
                       </div> 
-                      <div class="row" >
+                      <div id="globalAccessNotice" class="alert alert-warning d-none">
+                          This user role has access to all stores. All active stores will be assigned automatically on save.
+                      </div>
+                      <div class="row" id="storeMappingTable">
                         <div class="table-responsive mb-4">
                             <table class="table table-bordered">
                                 <thead>
                                     <tr>
                                         <th scope="col" style="width: 50px">#</th>
                                         <th scope="col" style="width: 120px"><input class="form-check-input" type="checkbox"  id="selectAll"> Select All</th>
-                                        <th scope="col">Department</th>
+                                        <th scope="col">Store</th>
                                         
                                     </tr>
                                 </thead>
@@ -88,7 +103,7 @@
                                     
                                     <tr>
                                         <td>{{ $loop->iteration}}</td>
-                                        <td><input class="form-check-input" type="checkbox" 
+                                        <td><input class="form-check-input store-checkbox" type="checkbox" 
                                         name="department_id[]" 
                                         value="{{ $listde->id }}"
                                         
@@ -118,45 +133,81 @@
 @section('scripts')
 
 <script>
-     document.getElementById('selectAll').addEventListener('click', function () {
-        let checkboxes = document.querySelectorAll('input[name="department_id[]"]');
-        
-        checkboxes.forEach(function (checkbox) {
-            checkbox.checked = document.getElementById('selectAll').checked;
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const storeCheckboxes = () => document.querySelectorAll('.store-checkbox');
+    const globalAccessNotice = document.getElementById('globalAccessNotice');
+    const storeMappingTable = document.getElementById('storeMappingTable');
+    const staffRoleInfo = document.getElementById('staffRoleInfo');
+    const staffRoleName = document.getElementById('staffRoleName');
+
+    function setStoreCheckboxesDisabled(disabled) {
+        storeCheckboxes().forEach(function (checkbox) {
+            checkbox.disabled = disabled;
         });
-    });
-    </script>
- 
-<script>
-    // Select All
-    document.getElementById('selectAll').addEventListener('click', function () {
-        let checkboxes = document.querySelectorAll('input[name="department_id[]"]');
-        checkboxes.forEach(function (checkbox) {
-            checkbox.checked = document.getElementById('selectAll').checked;
+        selectAllCheckbox.disabled = disabled;
+    }
+
+    selectAllCheckbox.addEventListener('click', function () {
+        storeCheckboxes().forEach(function (checkbox) {
+            if (!checkbox.disabled) {
+                checkbox.checked = selectAllCheckbox.checked;
+            }
         });
     });
 
-    // Fetch mapped stores when staff is selected
-    document.querySelector('select[name="staff_id"]').addEventListener('change', function () {
+    document.getElementById('staffSelect').addEventListener('change', function () {
         let staffId = this.value;
 
         if (!staffId) return;
 
         fetch(`{{ url('/get-staff-stores') }}/${staffId}`)
             .then(response => response.json())
-            .then(mappedIds => {
-                // Uncheck all first
-                document.querySelectorAll('input[name="department_id[]"]').forEach(cb => {
+            .then(data => {
+                const mappedIds = data.mapped_ids || [];
+
+                staffRoleInfo.classList.remove('d-none');
+                staffRoleName.textContent = data.role_name || 'No role assigned';
+
+                storeCheckboxes().forEach(cb => {
                     cb.checked = false;
                 });
 
-                // Tick the mapped ones
+                if (data.access_all_stores) {
+                    globalAccessNotice.classList.remove('d-none');
+                    setStoreCheckboxesDisabled(true);
+                    storeCheckboxes().forEach(cb => {
+                        cb.checked = true;
+                    });
+                    selectAllCheckbox.checked = true;
+                    return;
+                }
+
+                globalAccessNotice.classList.add('d-none');
+                setStoreCheckboxesDisabled(false);
+
                 mappedIds.forEach(id => {
                     let cb = document.querySelector(`input[name="department_id[]"][value="${id}"]`);
                     if (cb) cb.checked = true;
                 });
             });
     });
+
+    @if(session('mapped_staff_id'))
+    document.addEventListener('DOMContentLoaded', function () {
+        const staffSelect = document.getElementById('staffSelect');
+        staffSelect.value = '{{ session('mapped_staff_id') }}';
+        staffSelect.dispatchEvent(new Event('change'));
+
+        @if(session('mapped_departments'))
+        const mapped = @json(session('mapped_departments'));
+        setTimeout(function () {
+            document.querySelectorAll('.store-checkbox').forEach(cb => {
+                cb.checked = mapped.includes(parseInt(cb.value, 10)) || mapped.includes(cb.value);
+            });
+        }, 400);
+        @endif
+    });
+    @endif
 </script>
  
 @endsection
