@@ -60,28 +60,40 @@ $activeRoute = 'ReceivedStocks';
             @endphp
             <tr>
                 <td>{{ $loop->iteration }}</td>
-                <td>{{ $lists->itemname->item_code }}</td>
-                <td>{{ $lists->itemname->name }}</td>
+                <td>{{ $lists->itemname->item_code ?? '' }}</td>
+                <td>{{ $lists->itemname->name ?? '' }}</td>
                 <td>{{ $lists->itemname->unitname->name ?? '' }}</td>
                 <td>{{ $lists->batch_number ?? '' }}</td>
                 <td>{{ $lists->supname->company ?? '' }}</td>
                 <td>{{ $lists->purchase_order ?? '' }}</td>
-                <td>{{ $lists->waybill }}</td>
-                <td>{{ $lists->expiry_date }}</td>
-                <td>{{ $lists->award_letter }}</td>
-                <td>{{ $lists->staffname->name }}</td>
+                <td>{{ $lists->waybill ?? '' }}</td>
+                <td>{{ $lists->expiry_date ?? '' }}</td>
+                <td>{{ $lists->award_letter ?? '' }}</td>
+                <td>{{ $lists->staffname->name ?? '' }}</td>
                 <td>{{ $lists->amount ?? '' }}</td>
                 <td>{{ $lists->qty ?? '' }}</td>
                 <td>{{ number_format($lineTotal, 2) }}</td>
             </tr>
             @endforeach
-            <tr>
-                <td colspan="11"><b style="float: right">TOTAL</b></td>
-                <td></td>
-                <td><b>{{ $totalqty }}</b></td>
-                <td><b>{{ number_format($grandTotal, 2) }}</b></td>
-            </tr>
         </tbody>
+        <tfoot>
+            <tr class="rp-totals-row">
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td class="text-end fw-bold">TOTAL</td>
+                <td></td>
+                <td class="fw-bold">{{ $totalqty }}</td>
+                <td class="fw-bold">{{ number_format($grandTotal, 2) }}</td>
+            </tr>
+        </tfoot>
     </table>
 </div>
 @endsection
@@ -90,7 +102,11 @@ $activeRoute = 'ReceivedStocks';
 @push('report-scripts')
 <script>
 if ($.fn.DataTable && $('#reportTable tbody tr').length) {
-    $('#reportTable').DataTable({ pageLength: 25, order: [] });
+    $('#reportTable').DataTable({
+        pageLength: 25,
+        order: [],
+        columnDefs: [{ orderable: false, targets: 0 }],
+    });
 }
 </script>
 @endpush

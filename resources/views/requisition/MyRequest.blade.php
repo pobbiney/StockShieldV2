@@ -144,6 +144,7 @@
         overflow: hidden;
         box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
         animation: statIn 0.5s ease 0.25s both;
+        background: #fff;
     }
 
     .mr-table-head {
@@ -197,7 +198,13 @@
     }
 
     #myRequestTable tbody tr:nth-child(even) { background: #fafafa; }
+    #myRequestTable tbody tr:nth-child(odd)  { background: #fff; }
     #myRequestTable tbody tr:hover { background: #f0fdfa !important; }
+
+    .mr-table-card .table-responsive,
+    .mr-table-card .dataTables_wrapper {
+        background: #fff;
+    }
 
     .code-badge {
         display: inline-block;

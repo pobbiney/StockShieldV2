@@ -36,6 +36,11 @@ class Stock extends Model
 	{
 		return $this->belongsTo(User::class, 'created_by' ,'id'); //  
 	}
+
+    public function rejectedByUser()
+    {
+        return $this->belongsTo(User::class, 'rejected_by', 'id');
+    }
     
 
 

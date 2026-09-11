@@ -837,7 +837,7 @@ class RequisitionController extends Controller
         $listissues = ItemIssue::with(['staffname', 'storename', 'itemcode', 'itemname.unitname', 'issuefrom'])
             ->whereIn('store_id', $listdept)
             ->where('requisition_no', $decodeID)
-            ->where('status', 'pending')
+            ->submittedForHodApproval()
             ->orderBy('batch_number')
             ->orderBy('id')
             ->get();

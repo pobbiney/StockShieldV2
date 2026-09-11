@@ -53,6 +53,11 @@ class ItemRequest extends Model
         return $this->belongsTo(User::class, 'issued_by', 'id');
     }
 
+    public function approvedByUser()
+    {
+        return $this->belongsTo(User::class, 'approved_by', 'id');
+    }
+
     public function issuefrom()
     {
         return $this->belongsTo(Store::class, 'store_id', 'id');

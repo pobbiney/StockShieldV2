@@ -106,20 +106,58 @@
     }
 
     .stat-card {
+        position: relative;
         border-radius: 1.125rem;
         padding: 1.35rem 1.4rem;
         height: 100%;
-        background: #fff;
-        border: 1px solid rgba(0, 0, 0, 0.07);
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+        background: linear-gradient(
+            145deg,
+            rgba(var(--stat-accent-rgb, 99, 102, 241), 0.1) 0%,
+            #fff 58%
+        );
+        border: 1px solid rgba(var(--stat-accent-rgb, 99, 102, 241), 0.2);
+        box-shadow: 0 4px 18px rgba(var(--stat-accent-rgb, 99, 102, 241), 0.1);
         animation: dbStatIn 0.5s ease both;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        overflow: hidden;
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(
+            90deg,
+            rgb(var(--stat-accent-rgb, 99, 102, 241)),
+            rgba(var(--stat-accent-rgb, 99, 102, 241), 0.45)
+        );
+    }
+
+    .stat-card::after {
+        content: '';
+        position: absolute;
+        top: -30px;
+        right: -30px;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: rgba(var(--stat-accent-rgb, 99, 102, 241), 0.08);
+        pointer-events: none;
     }
 
     .stat-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        transform: translateY(-4px);
+        box-shadow: 0 12px 28px rgba(var(--stat-accent-rgb, 99, 102, 241), 0.18);
+        border-color: rgba(var(--stat-accent-rgb, 99, 102, 241), 0.35);
     }
+
+    .stat-card.pending  { --stat-accent-rgb: 124, 58, 237; }
+    .stat-card.reorder  { --stat-accent-rgb: 234, 88, 12; }
+    .stat-card.expiry   { --stat-accent-rgb: 220, 38, 38; }
+    .stat-card.stock    { --stat-accent-rgb: 22, 163, 74; }
 
     .stat-card:nth-child(1) { animation-delay: 0.05s; }
     .stat-card:nth-child(2) { animation-delay: 0.1s; }
@@ -132,6 +170,8 @@
     }
 
     .stat-card-top {
+        position: relative;
+        z-index: 1;
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
@@ -146,38 +186,63 @@
         align-items: center;
         justify-content: center;
         font-size: 1.25rem;
+        background: linear-gradient(
+            135deg,
+            rgba(var(--stat-accent-rgb, 99, 102, 241), 0.22),
+            rgba(var(--stat-accent-rgb, 99, 102, 241), 0.08)
+        );
+        color: rgb(var(--stat-accent-rgb, 99, 102, 241));
+        border: 1px solid rgba(var(--stat-accent-rgb, 99, 102, 241), 0.2);
+        transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
     }
 
-    .stat-card.pending  .stat-card-icon { background: rgba(124, 58, 237, 0.12); color: #7c3aed; }
-    .stat-card.reorder  .stat-card-icon { background: rgba(234, 88, 12, 0.12); color: #ea580c; }
-    .stat-card.expiry   .stat-card-icon { background: rgba(220, 38, 38, 0.12); color: #dc2626; }
-    .stat-card.stock    .stat-card-icon { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
-
-    .stat-card.pending .stat-card-value { color: #7c3aed; }
-    .stat-card.reorder .stat-card-value { color: #ea580c; }
-    .stat-card.expiry  .stat-card-value { color: #dc2626; }
-    .stat-card.stock   .stat-card-value { color: #16a34a; }
+    .stat-card:hover .stat-card-icon {
+        background: rgb(var(--stat-accent-rgb, 99, 102, 241));
+        color: #fff;
+        transform: scale(1.06);
+    }
 
     .stat-card-value {
+        position: relative;
+        z-index: 1;
         font-size: clamp(1.75rem, 4vw, 2.25rem);
         font-weight: 800;
         line-height: 1;
         margin-bottom: 0.25rem;
+        color: rgb(var(--stat-accent-rgb, 99, 102, 241));
     }
 
-    .stat-card-label { font-size: 0.82rem; color: #64748b; margin: 0; }
+    .stat-card-label {
+        position: relative;
+        z-index: 1;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: rgb(var(--stat-accent-rgb, 99, 102, 241));
+        opacity: 0.85;
+        margin: 0;
+    }
+
     .stat-card-link {
+        position: relative;
+        z-index: 1;
         display: inline-flex;
         align-items: center;
         gap: 0.25rem;
         font-size: 0.72rem;
         font-weight: 600;
-        color: #2563eb;
+        color: rgb(var(--stat-accent-rgb, 99, 102, 241));
         text-decoration: none;
         margin-top: 0.65rem;
+        opacity: 0.9;
     }
 
-    .stat-card-link:hover { color: #1d4ed8; }
+    .stat-card-link:hover {
+        color: rgb(var(--stat-accent-rgb, 99, 102, 241));
+        opacity: 1;
+    }
+
+    .stat-card-link.text-muted { color: #64748b !important; opacity: 1; }
+    .stat-card-link.text-danger { color: #dc2626 !important; opacity: 1; }
 
     .db-panel {
         border-radius: 1.25rem;
@@ -472,7 +537,11 @@
                                                         </div>
                 <div class="stat-card-value">{{ number_format($reorderItemsCount) }}</div>
                 <p class="stat-card-label">Re-order Alerts</p>
-                <a href="{{ route('reOrder') }}" class="stat-card-link">Manage levels <i class="bi bi-arrow-right"></i></a>
+                @if($alertStoreName ?? null)
+                    <span class="stat-card-link text-muted" style="cursor:default;">{{ $alertStoreName }}</span>
+                @else
+                    <a href="{{ route('reOrder') }}" class="stat-card-link">Manage levels <i class="bi bi-arrow-right"></i></a>
+                @endif
                                                         </div>
                                                     </div>
         <div class="col-sm-6 col-xl-3">
@@ -480,8 +549,13 @@
                 <div class="stat-card-top">
                     <div class="stat-card-icon"><i class="bi bi-calendar-x"></i></div>
                 </div>
-                <div class="stat-card-value">{{ number_format($count) }}</div>
-                <p class="stat-card-label">Expiring in 3 Months</p>
+                <div class="stat-card-value">{{ number_format($expiryAlertCount ?? $count ?? 0) }}</div>
+                <p class="stat-card-label">Expiry Alerts</p>
+                @if(($expiredCount ?? 0) > 0)
+                    <span class="stat-card-link text-danger" style="cursor:default;">{{ number_format($expiredCount) }} expired</span>
+                @else
+                    <span class="stat-card-link text-muted" style="cursor:default;">Expiring within 3 months</span>
+                @endif
                                                 </div>
                                             </div>
         <div class="col-sm-6 col-xl-3">
@@ -497,30 +571,80 @@
                             </div>
 
     @if($isCentralStore)
+    @if(($canApproveRequisitions ?? false) && ($awaitingHodCount ?? 0) > 0)
     <div class="row g-3 mb-3">
         <div class="col-12">
             <div class="db-panel">
                 <div class="db-panel-head">
                     <div>
-                        <h5><i class="bi bi-truck me-2 text-warning"></i>Incoming Requisitions</h5>
-                        <small>Satellite stores requesting stock from {{ $activeStore->name ?? 'your central store' }}</small>
-                                                        </div>
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                        @if($awaitingHodCount > 0)
-                            <span class="count-badge info">{{ $awaitingHodCount }} awaiting HOD</span>
-                        @endif
-                        @if($pendingRequisitionCount > 0)
-                            <span class="count-badge warn">{{ $pendingRequisitionCount }} ready to issue</span>
-                        @endif
-                                                        </div>
-                                                    </div>
+                        <h5><i class="bi bi-patch-check me-2 text-primary"></i>Requisitions Awaiting HOD Approval</h5>
+                        <small>Approve requisitions before the store manager can issue stock</small>
+                    </div>
+                    <span class="count-badge info">{{ $awaitingHodCount }}</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="req-table">
+                        <thead>
+                            <tr>
+                                <th>Requisition No</th>
+                                <th>Requesting Store</th>
+                                <th>Items</th>
+                                <th>Requested Qty</th>
+                                <th>Submitted</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($awaitingHodRequisitions->take(10) as $req)
+                                <tr>
+                                    <td><span class="req-no-badge">{{ $req->requisition_no }}</span></td>
+                                    <td>
+                                        <span class="store-chip">
+                                            <i class="bi bi-shop"></i>
+                                            {{ $req->requesting_store->name ?? '—' }}
+                                        </span>
+                                    </td>
+                                    <td>{{ $req->line_count }}</td>
+                                    <td><strong>{{ number_format($req->total_qty) }}</strong></td>
+                                    <td>
+                                        {{ $req->submitted_at?->format('M d, Y') }}
+                                        <div class="text-muted small">{{ $req->submitted_at?->format('h:i A') }}</div>
+                                    </td>
+                                    <td>
+                                        <a href="{{ route('ApproveRequest') }}" class="btn-issue-sm" style="background:#2563eb;">
+                                            <i class="bi bi-check2-square"></i> Review
+                                        </a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 
-                @if($awaitingHodCount > 0)
+    @if($canIssueStock ?? false)
+    <div class="row g-3 mb-3">
+        <div class="col-12">
+            <div class="db-panel">
+                <div class="db-panel-head">
+                    <div>
+                        <h5><i class="bi bi-truck me-2 text-warning"></i>Ready to Issue</h5>
+                        <small>HOD-approved requisitions waiting for store manager to issue from {{ $activeStore->name ?? 'your central store' }}</small>
+                    </div>
+                    @if(($pendingRequisitionCount ?? 0) > 0)
+                        <span class="count-badge warn">{{ $pendingRequisitionCount }} ready</span>
+                    @endif
+                </div>
+
+                @if(($canIssueStock ?? false) && ($awaitingHodCount ?? 0) > 0 && !($canApproveRequisitions ?? false))
                     <div class="hod-wait-banner">
                         <i class="bi bi-info-circle me-1"></i>
                         <strong>{{ $awaitingHodCount }}</strong> requisition{{ $awaitingHodCount !== 1 ? 's' : '' }}
-                        ({{ $awaitingHodRequisitions->sum('line_count') }} items) awaiting HOD approval before you can issue.
-                                                        </div>
+                        still awaiting HOD approval before you can issue.
+                    </div>
                 @endif
 
                 @if($incomingRequisitions->isNotEmpty())
@@ -564,24 +688,99 @@
                                 @endforeach
                             </tbody>
                         </table>
-                                                        </div>
+                    </div>
                     @if($pendingRequisitionCount > 10)
                         <div class="p-3 border-top text-center">
                             <a href="{{ route('IssueItem') }}" class="stat-card-link">
                                 View all {{ $pendingRequisitionCount }} requisitions <i class="bi bi-arrow-right"></i>
                             </a>
-                                                    </div>
+                        </div>
                     @endif
                 @else
                     <div class="db-empty">
                         <i class="bi bi-inbox"></i>
                         <p class="mb-0">No approved requisitions waiting to be issued.</p>
-                                                </div>
+                    </div>
                 @endif
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                 @endif
+            </div>
+        </div>
+    </div>
+    @endif
+
+    @if(($canApproveIssues ?? false))
+    <div class="row g-3 mb-3">
+        <div class="col-12">
+            <div class="db-panel">
+                <div class="db-panel-head">
+                    <div>
+                        <h5><i class="bi bi-shield-check me-2 text-purple"></i>Issue Approvals</h5>
+                        <small>Approve issues only after the store manager has submitted them</small>
+                    </div>
+                    @if(($pendingIssueApprovalCount ?? 0) > 0)
+                        <span class="count-badge warn">{{ $pendingIssueApprovalCount }}</span>
+                    @endif
+                </div>
+
+                @if(($pendingIssueApprovals ?? collect())->isNotEmpty())
+                    <div class="table-responsive">
+                        <table class="req-table">
+                            <thead>
+                                <tr>
+                                    <th>Requisition No</th>
+                                    <th>Requesting Store</th>
+                                    <th>Items</th>
+                                    <th>Issued Qty</th>
+                                    <th>Submitted By</th>
+                                    <th>Submitted</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($pendingIssueApprovals->take(10) as $req)
+                                    <tr>
+                                        <td><span class="req-no-badge">{{ $req->requisition_no }}</span></td>
+                                        <td>
+                                            <span class="store-chip">
+                                                <i class="bi bi-shop"></i>
+                                                {{ $req->requesting_store->name ?? '—' }}
+                                            </span>
+                                        </td>
+                                        <td>{{ $req->line_count }}</td>
+                                        <td><strong>{{ number_format($req->total_qty) }}</strong></td>
+                                        <td>{{ $req->issued_by->name ?? '—' }}</td>
+                                        <td>
+                                            {{ $req->submitted_at?->format('M d, Y') }}
+                                            <div class="text-muted small">{{ $req->submitted_at?->format('h:i A') }}</div>
+                                        </td>
+                                        <td>
+                                            <a href="{{ route('viewIssues', Crypt::encrypt($req->requisition_no)) }}"
+                                               class="btn-issue-sm" style="background:#7c3aed;">
+                                                <i class="bi bi-check2-square"></i> Approve
+                                            </a>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    @if(($pendingIssueApprovalCount ?? 0) > 10)
+                        <div class="p-3 border-top text-center">
+                            <a href="{{ route('IssueApproval') }}" class="stat-card-link">
+                                View all {{ $pendingIssueApprovalCount }} pending issues <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
+                    @endif
+                @else
+                    <div class="db-empty">
+                        <i class="bi bi-check-circle"></i>
+                        <p class="mb-0">No issues awaiting your approval. Items appear here after the store manager issues stock.</p>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+    @endif
+    @endif
 
     @if($isSatelliteStore ?? false)
     <div class="row g-3 mb-3">
@@ -665,7 +864,12 @@
                         <div class="db-panel-head">
                             <div>
                                 <h5><i class="bi bi-arrow-repeat me-2 text-warning"></i>Re-order Alerts</h5>
-                                <small>Items at or below reorder level</small>
+                                <small>
+                                    Items at or below reorder level
+                                    @if($alertStoreName ?? null)
+                                        &middot; {{ $alertStoreName }}
+                                    @endif
+                                </small>
                                     </div>
                             @if($reorderItemsCount > 0)
                                 <span class="count-badge warn">{{ $reorderItemsCount }}</span>
@@ -708,16 +912,38 @@
                         <div class="db-panel-head">
                             <div>
                                 <h5><i class="bi bi-calendar-event me-2 text-danger"></i>Expiry Watch</h5>
-                                <small>Products expiring within 3 months</small>
+                                <small>
+                                    Expiring soon and expired stock
+                                    @if($alertStoreName ?? null)
+                                        &middot; {{ $alertStoreName }}
+                                    @endif
+                                </small>
                                     </div>
-                            @if($count > 0)
-                                <span class="count-badge danger">{{ $count }}</span>
+                            @if(($expiryAlertCount ?? $count ?? 0) > 0)
+                                <span class="count-badge danger">{{ $expiryAlertCount ?? $count }}</span>
                             @endif
                                                     </div>
-                        @if($notifications->isNotEmpty())
+                        @if(($expiringItems ?? $notifications ?? collect())->isNotEmpty() || ($expiredItems ?? collect())->isNotEmpty())
                             <div class="expiry-scroll">
                                 <ul class="alert-list">
-                                    @foreach($notifications->take(10) as $note)
+                                    @foreach(($expiredItems ?? collect())->take(5) as $note)
+                                        <li class="alert-item">
+                                            <div class="alert-icon reorder">
+                                                <i class="bi bi-calendar-x"></i>
+                                            </div>
+                                            <div class="alert-body">
+                                                <h6>{{ $note->name }}</h6>
+                                                <p>
+                                                    Qty {{ number_format($note->qty) }}
+                                                    &middot; Expired {{ \Carbon\Carbon::parse($note->expiry_date)->format('M d, Y') }}
+                                                </p>
+                                                <span class="alert-tag critical">
+                                                    Expired {{ abs((int) $note->days_left) }} day{{ abs((int) $note->days_left) !== 1 ? 's' : '' }} ago
+                                                </span>
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                    @foreach(($expiringItems ?? $notifications ?? collect())->take(10) as $note)
                                         <li class="alert-item">
                                             <div class="alert-icon expiry">
                                                 <i class="bi bi-clock-history"></i>
@@ -739,7 +965,7 @@
                         @else
                             <div class="db-empty">
                                 <i class="bi bi-shield-check"></i>
-                                <p class="mb-0">No items expiring in the next 3 months.</p>
+                                <p class="mb-0">No expiring or expired items for your store.</p>
                                         </div>
                         @endif
                                                         </div>
@@ -756,39 +982,62 @@
                                                             </div>
                                                         </div>
                 <div class="quick-grid">
-                    <a href="{{ route('stockEntry') }}" class="quick-link">
-                        <div class="quick-link-icon"><i class="bi bi-box-arrow-in-down"></i></div>
-                        <span>Stock Entry</span>
-                        <small>Record incoming stock</small>
-                    </a>
-                    <a href="{{ route('pendingStock') }}" class="quick-link">
-                        <div class="quick-link-icon"><i class="bi bi-hourglass"></i></div>
-                        <span>Pending Stock</span>
-                        <small>Awaiting approval</small>
-                    </a>
-                    @if($canApproveStock)
+                    @if($canStockEntry ?? false)
+                        <a href="{{ route('stockEntry') }}" class="quick-link">
+                            <div class="quick-link-icon"><i class="bi bi-box-arrow-in-down"></i></div>
+                            <span>Stock Entry</span>
+                            <small>Record incoming stock</small>
+                        </a>
+                    @endif
+                    @if($canPendingStock ?? false)
+                        <a href="{{ route('pendingStock') }}" class="quick-link">
+                            <div class="quick-link-icon"><i class="bi bi-hourglass"></i></div>
+                            <span>Pending Stock</span>
+                            <small>Awaiting approval</small>
+                        </a>
+                    @endif
+                    @if($canStockApprovalMenu ?? false)
                         <a href="{{ route('stockApproval') }}" class="quick-link">
                             <div class="quick-link-icon"><i class="bi bi-check2-square"></i></div>
                             <span>Stock Approval</span>
                             <small>Review submissions</small>
                         </a>
                     @endif
-                    <a href="{{ route('IssueItem') }}" class="quick-link">
-                        <div class="quick-link-icon"><i class="bi bi-box-arrow-right"></i></div>
-                        <span>Issue Items</span>
-                        <small>Issue from inventory</small>
-                    </a>
-                    <a href="{{ route('Item') }}" class="quick-link">
-                        <div class="quick-link-icon"><i class="bi bi-tags"></i></div>
-                        <span>Items</span>
-                        <small>Manage product catalog</small>
-                    </a>
-                    <a href="{{ route('reOrder') }}" class="quick-link">
-                        <div class="quick-link-icon"><i class="bi bi-sliders"></i></div>
-                        <span>Reorder Levels</span>
-                        <small>Set minimum stock</small>
-                    </a>
-                                                        </div>
+                    @if($canApproveIssues ?? false)
+                        <a href="{{ route('IssueApproval') }}" class="quick-link">
+                            <div class="quick-link-icon"><i class="bi bi-shield-check"></i></div>
+                            <span>Issue Approval</span>
+                            <small>HOD review of issued stock</small>
+                        </a>
+                    @endif
+                    @if($canIssueStock ?? false)
+                        <a href="{{ route('IssueItem') }}" class="quick-link">
+                            <div class="quick-link-icon"><i class="bi bi-box-arrow-right"></i></div>
+                            <span>Issue Items</span>
+                            <small>Issue from inventory</small>
+                        </a>
+                    @endif
+                    @if($canManageItems ?? false)
+                        <a href="{{ route('Item') }}" class="quick-link">
+                            <div class="quick-link-icon"><i class="bi bi-tags"></i></div>
+                            <span>Items</span>
+                            <small>Manage product catalog</small>
+                        </a>
+                    @endif
+                    @if($canReorder ?? false)
+                        <a href="{{ route('reOrder') }}" class="quick-link">
+                            <div class="quick-link-icon"><i class="bi bi-sliders"></i></div>
+                            <span>Reorder Levels</span>
+                            <small>Set minimum stock</small>
+                        </a>
+                    @endif
+                    @if(!($canStockEntry ?? false) && !($canPendingStock ?? false) && !($canStockApprovalMenu ?? false) && !($canApproveIssues ?? false) && !($canIssueStock ?? false) && !($canManageItems ?? false) && !($canReorder ?? false))
+                        <div class="db-empty py-4">
+                            <i class="bi bi-lock"></i>
+                            <p class="mb-0">No quick actions available for your role.</p>
+                        </div>
+                    @endif
+                </div>
                                                     </div>
                                                 </div>
                                             </div>

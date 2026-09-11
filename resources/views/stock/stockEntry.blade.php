@@ -19,6 +19,7 @@
             'code' => $item->item_code ?? '',
             'name' => $item->name ?? '',
             'store' => optional($item->storename)->name ?? '',
+            'storeId' => (int) $item->store_id,
         ];
     })->values();
 @endphp
@@ -535,7 +536,7 @@
         right: 0;
         top: calc(100% + 4px);
         z-index: 1060;
-        max-height: 240px;
+        max-height: 320px;
         overflow-y: auto;
         margin: 0;
         padding: 0.35rem;
@@ -756,14 +757,14 @@
                                     <button type="button"
                                             class="btn-action edit showmodal me-1"
                                             title="Edit"
-                                            data-url="{{ route('stock-id', $lists->id) }}">
+                                            data-url="{{ route('stock-id', ['id' => $lists->id, 'source' => ($isSatelliteStore ?? false) ? 'satellite' : 'central']) }}">
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <button type="button"
                                             class="btn-action delete btn-confirm-delete"
                                             title="Delete"
                                             data-item-name="{{ $itemName }}"
-                                            data-delete-url="{{ url('stockEntry/'.$lists->id.'/delete') }}">
+                                            data-delete-url="{{ url('stockEntry/'.$lists->id.'/delete'.($isSatelliteStore ?? false ? '?source=satellite' : '')) }}">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </td>
@@ -818,7 +819,7 @@
                                     <ul class="item-autocomplete-list" id="add_item_list" role="listbox" hidden></ul>
                                 </div>
                                 @error('item') <small class="text-danger">{{ $message }}</small> @enderror
-                                <div class="field-hint">{{ $isSatelliteStore ? 'All active items in the system — store shown in suggestions' : 'Suggestions appear as you type' }}</div>
+                                <div class="field-hint">{{ $isSatelliteStore ? 'All items in the system — store shown in suggestions' : 'Click the field to browse all items for the selected store, or type to search' }}</div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="add_batch">Batch Number</label>
@@ -1116,9 +1117,11 @@ const StockAlert = {
 
 const STOCK_ITEMS = @json($stockItemsJson);
 
-function ItemAutocomplete(root, items) {
+function ItemAutocomplete(root, items, options) {
+    options = options || {};
     this.root = root;
     this.items = items || [];
+    this.getStoreFilterId = options.getStoreFilterId || null;
     this.input = root.querySelector('.item-autocomplete-input');
     this.hidden = root.querySelector('input[type="hidden"]');
     this.list = root.querySelector('.item-autocomplete-list');
@@ -1127,7 +1130,7 @@ function ItemAutocomplete(root, items) {
     this.selectedItem = null;
 
     this.input.addEventListener('input', () => this.onInput());
-    this.input.addEventListener('focus', () => this.onInput());
+    this.input.addEventListener('focus', () => this.onFocus());
     this.input.addEventListener('keydown', (e) => this.onKeydown(e));
     this.clearBtn.addEventListener('click', () => this.clear());
 
@@ -1142,15 +1145,33 @@ ItemAutocomplete.prototype.labelFor = function (item) {
     return (item.code ? item.code + ' — ' : '') + item.name;
 };
 
-ItemAutocomplete.prototype.filter = function (term) {
-    const q = term.trim().toLowerCase();
-    if (!q) {
-        return [];
+ItemAutocomplete.prototype.poolForStore = function () {
+    const storeId = this.getStoreFilterId ? this.getStoreFilterId() : null;
+    if (!storeId) {
+        return this.items.slice();
     }
     return this.items.filter(function (item) {
-        return item.name.toLowerCase().indexOf(q) > -1
-            || String(item.code).toLowerCase().indexOf(q) > -1;
-    }).slice(0, 12);
+        return String(item.storeId) === String(storeId);
+    });
+};
+
+ItemAutocomplete.prototype.filter = function (term) {
+    const pool = this.poolForStore();
+    const q = term.trim().toLowerCase();
+    if (!q) {
+        return pool;
+    }
+
+    const parts = q.split(/\s*[—–-]\s*/).map(function (p) { return p.trim(); }).filter(Boolean);
+    const needles = parts.length > 1 ? parts : [q];
+
+    return pool.filter(function (item) {
+        const name = (item.name || '').toLowerCase();
+        const code = String(item.code || '').toLowerCase();
+        return needles.some(function (n) {
+            return name.indexOf(n) > -1 || code.indexOf(n) > -1;
+        });
+    });
 };
 
 ItemAutocomplete.prototype.render = function (matches) {
@@ -1238,16 +1259,16 @@ ItemAutocomplete.prototype.closeList = function () {
     this._currentMatches = [];
 };
 
+ItemAutocomplete.prototype.onFocus = function () {
+    this.render(this.filter(this.input.value));
+};
+
 ItemAutocomplete.prototype.onInput = function () {
     const term = this.input.value;
     if (this.selectedItem && this.labelFor(this.selectedItem) !== term) {
         this.selectedItem = null;
         this.hidden.value = '';
         this.root.classList.remove('has-value');
-    }
-    if (!term.trim()) {
-        this.closeList();
-        return;
     }
     this.render(this.filter(term));
 };
@@ -1293,9 +1314,44 @@ ItemAutocomplete.prototype.onKeydown = function (e) {
 let addItemAutocomplete;
 let editItemAutocomplete;
 
+function stockEntryStoreIdFromForm(formId, fallbackStoreId) {
+    const form = document.getElementById(formId);
+    if (!form) {
+        return fallbackStoreId ? String(fallbackStoreId) : null;
+    }
+    const hidden = form.querySelector('input[name="store"]');
+    if (hidden && hidden.value) {
+        return String(hidden.value);
+    }
+    const select = form.querySelector('select[name="store"]');
+    if (select && select.value) {
+        return String(select.value);
+    }
+    return fallbackStoreId ? String(fallbackStoreId) : null;
+}
+
 $(document).ready(function () {
-    addItemAutocomplete = new ItemAutocomplete(document.getElementById('addItemAutocomplete'), STOCK_ITEMS);
-    editItemAutocomplete = new ItemAutocomplete(document.getElementById('editItemAutocomplete'), STOCK_ITEMS);
+    const activeStoreId = @json($activeStoreId);
+
+    addItemAutocomplete = new ItemAutocomplete(document.getElementById('addItemAutocomplete'), STOCK_ITEMS, {
+        getStoreFilterId: function () {
+            return stockEntryStoreIdFromForm('addStockForm', activeStoreId);
+        },
+    });
+    editItemAutocomplete = new ItemAutocomplete(document.getElementById('editItemAutocomplete'), STOCK_ITEMS, {
+        getStoreFilterId: function () {
+            return stockEntryStoreIdFromForm('editStockForm', activeStoreId);
+        },
+    });
+
+    $('#add_store').on('change', function () {
+        addItemAutocomplete.clear(false);
+        addItemAutocomplete.onFocus();
+    });
+    $('#edit_store').on('change', function () {
+        editItemAutocomplete.clear(false);
+        editItemAutocomplete.onFocus();
+    });
 
     if (addItemAutocomplete.hidden.value) {
         addItemAutocomplete.root.classList.add('has-value');

@@ -78,6 +78,11 @@ class StockReversal extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    public function rejectedByUser()
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
     public function typeLabel(): string
     {
         return match ($this->reversal_type) {

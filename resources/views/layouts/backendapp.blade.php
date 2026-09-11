@@ -857,6 +857,79 @@
         .ss-toast-persistent {
             border-left: 3px solid #25d366;
         }
+
+        /* DataTables — ensure white backgrounds app-wide */
+        .adminuiux-content .dataTables_wrapper {
+            background: #fff;
+        }
+
+        .adminuiux-content .dataTables_wrapper .table-responsive,
+        .adminuiux-content .dataTables_wrapper .dataTables_scroll,
+        .adminuiux-content .dataTables_wrapper .dataTables_scrollBody {
+            background: #fff;
+        }
+
+        .adminuiux-content table.dataTable {
+            background: #fff;
+            border-collapse: collapse;
+        }
+
+        .adminuiux-content table.dataTable thead th,
+        .adminuiux-content table.dataTable thead td {
+            background-color: #f8fafc;
+        }
+
+        .adminuiux-content table.dataTable tbody tr {
+            background-color: #fff;
+        }
+
+        .adminuiux-content table.dataTable tbody tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        .adminuiux-content table.dataTable tbody tr:hover {
+            background-color: #f8fafc !important;
+        }
+
+        .adminuiux-content table.dataTable tbody td {
+            background-color: transparent;
+        }
+
+        .adminuiux-content .dataTables_wrapper .dataTables_length,
+        .adminuiux-content .dataTables_wrapper .dataTables_filter,
+        .adminuiux-content .dataTables_wrapper .dataTables_info,
+        .adminuiux-content .dataTables_wrapper .dataTables_paginate {
+            background: #fff;
+            color: #64748b;
+        }
+
+        .adminuiux-content .dataTables_wrapper .dataTables_filter input,
+        .adminuiux-content .dataTables_wrapper .dataTables_length select {
+            background: #fff;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 0.35rem 0.75rem;
+        }
+
+        .adminuiux-content .dataTables_wrapper .dataTables_paginate .paginate_button {
+            background: #fff !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 0.375rem !important;
+            color: #475569 !important;
+        }
+
+        .adminuiux-content .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+        .adminuiux-content .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+            background: #0f172a !important;
+            border-color: #0f172a !important;
+            color: #fff !important;
+        }
+
+        .adminuiux-content .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+            background: #f8fafc !important;
+            border-color: #cbd5e1 !important;
+            color: #0f172a !important;
+        }
     </style>
 
   <script defer src="{{asset('backend/assets/js/app134b.js')}}"></script><link href="{{asset('backend/assets/css/app134b.css')}}" rel="stylesheet">
@@ -944,9 +1017,9 @@
                         <small id="notif-badge-count">0</small>
                         <span class="visually-hidden">unread action notifications</span>
                     </span>
-                    @if(($reorderItemsCount ?? 0) > 0)
-                    <span class="position-absolute top-0 start-0 badge rounded-pill bg-warning p-1" style="transform: translate(-30%, -20%);">
-                        <small>{{ $reorderItemsCount }}</small>
+                    @if(($stockAlertCount ?? 0) > 0)
+                    <span class="position-absolute top-0 start-0 badge rounded-pill bg-warning p-1" style="transform: translate(-30%, -20%);" title="Stock alerts for your store">
+                        <small>{{ $stockAlertCount }}</small>
                     </span>
                     @endif
                 </button>
@@ -1157,63 +1230,7 @@
             <p class="text-secondary small px-2 py-3 mb-0">Loading notifications...</p>
         </div>
 
-        @if(($reorderItemsCount ?? 0) > 0)
-        <div class="px-3 py-2 border-top border-bottom">
-            <strong class="small text-uppercase text-secondary">Stock Alerts</strong>
-        </div>
-        @endif
-        <div class="px-2 py-2">
-        @foreach($reorderItems as $item)
-
-        @if($item->total_qty  == $item->reorder_level)
-        <div class="alert alert-warning mb-2">
-            <div class="row gx-3">
-                <div class="col-auto">
-                    <figure class="avatar avatar-30 rounded-circle bg-warning text-white">
-                        <i class="bi bi-bell"></i>
-                    </figure>
-                </div>
-                <div class="col">
-                    <p class="small mb-2"><b> {{ $item->name }} </b> reached re-order level please re-stock to continue issuing.</p>
-
-                    {{-- <div class="row gx-3 align-items-center">
-                        <div class="col">
-                            <p class="text-secondary small">4 days ago</p>
-                        </div>
-                        <div class="col-auto">
-                            <a href="javascript:void(0)" class="btn btn-sm btn-square btn-link theme-red"><i class="bi bi-trash"></i></a>
-                        </div>
-                    </div> --}}
-                </div>
-            </div>
-        </div>
-         @elseif($item->total_qty  < $item->reorder_level)
-        
-       <div class="alert alert-danger mb-2">
-            <div class="row gx-3">
-                <div class="col-auto">
-                    <figure class="avatar avatar-30 rounded-circle bg-warning text-white">
-                        <i class="bi bi-bell"></i>
-                    </figure>
-                </div>
-                <div class="col">
-                    <p class="small mb-2"><b>{{ $item->name }}</b> is below re-order level please   re-stock to continue issuing.</p>
-
-                    {{-- <div class="row gx-3 align-items-center">
-                        <div class="col">
-                            <p class="text-secondary small">4 days ago</p>
-                        </div>
-                        <div class="col-auto">
-                            <a href="javascript:void(0)" class="btn btn-sm btn-square btn-link theme-red"><i class="bi bi-trash"></i></a>
-                        </div>
-                    </div> --}}
-                </div>
-            </div>
-        </div>
-       @endif
-
-      @endforeach
-        </div>
+        @include('layouts.partials.stock-alerts-offcanvas')
     </div>
 </div>
 

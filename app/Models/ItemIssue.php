@@ -38,6 +38,24 @@ protected $fillable = [
         return $query->where('status', 'issued')->where('status_two', 'issued');
     }
 
+    /**
+     * Issues submitted by the store manager and ready for HOD approval.
+     * Requisition-linked lines require item_request status "pending issue".
+     * Direct Issue Item entries (no requisition line) are included when created_by is set.
+     */
+    public function scopeSubmittedForHodApproval($query)
+    {
+        return $query->where('status', 'pending')
+            ->where(function ($query) {
+                $query->whereHas('itemRequest', function ($requestQuery) {
+                    $requestQuery->where('status', 'pending issue');
+                })->orWhere(function ($query) {
+                    $query->whereNull('item_request_id')
+                        ->whereNotNull('created_by');
+                });
+            });
+    }
+
     public function satelliteStockReceipt()
     {
         return $this->hasOne(SatelliteStockReceipt::class, 'item_issue_id');
@@ -76,6 +94,11 @@ protected $fillable = [
 	{
 		return $this->belongsTo(User::class, 'issued_by' ,'id'); // 'itemID' is the foreign key
 	}
+
+    public function rejectedByUser()
+    {
+        return $this->belongsTo(User::class, 'issued_by', 'id');
+    }
     
 
        public function issuefrom()

@@ -537,11 +537,84 @@ class StockController extends Controller
         }
     }
 
+    protected function pendingStockEntryUsesSatellite(?string $source): bool
+    {
+        if ($source === 'satellite') {
+            return true;
+        }
+
+        if ($source === 'central') {
+            return false;
+        }
+
+        return $this->isSatelliteStockContext();
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Stock|SatelliteStockEntry>
+     */
+    protected function collectPendingStockEntriesForScope(array $scopedStoreIds)
+    {
+        $stores = Store::whereIn('id', $scopedStoreIds)->get();
+
+        $centralStoreIds = $stores->where('store_group', '!=', 'satellite')->pluck('id');
+        $satelliteStoreIds = $stores->where('store_group', 'satellite')->pluck('id');
+
+        $centralPending = Stock::with(['itemcode', 'itemname', 'supname', 'storename'])
+            ->where('status', 'pending')
+            ->when(
+                $centralStoreIds->isNotEmpty(),
+                fn ($query) => $query->whereIn('store_id', $centralStoreIds),
+                fn ($query) => $query->whereRaw('1 = 0')
+            )
+            ->get()
+            ->each(fn (Stock $row) => $row->setAttribute('entry_source', 'central'));
+
+        $satellitePending = SatelliteStockEntry::with(['itemcode', 'itemname', 'supname', 'storename'])
+            ->where('status', 'pending')
+            ->when(
+                $satelliteStoreIds->isNotEmpty(),
+                fn ($query) => $query->whereIn('store_id', $satelliteStoreIds),
+                fn ($query) => $query->whereRaw('1 = 0')
+            )
+            ->get()
+            ->each(fn (SatelliteStockEntry $row) => $row->setAttribute('entry_source', 'satellite'));
+
+        return $centralPending
+            ->concat($satellitePending)
+            ->sortByDesc(fn ($row) => $row->created_at ?? $row->id)
+            ->values();
+    }
+
     protected function storeUsesSatelliteStockEntry(?Store $store = null): bool
     {
         $store = $store ?? $this->storeContext->getActiveStore();
 
         return $store?->store_group === 'satellite';
+    }
+
+    /**
+     * Items available in the stock-entry modal (must match the target store).
+     */
+    protected function stockEntryItemsQuery(array $scopedStoreIds, bool $isSatelliteStore)
+    {
+        if ($isSatelliteStore) {
+            return Item::with('storename')
+                ->orderBy('name');
+        }
+
+        $storeIdsForItems = $scopedStoreIds;
+
+        if (!$this->storeContext->hasGlobalStoreAccess()) {
+            $activeStoreId = $this->storeContext->getActiveStoreId();
+            if ($activeStoreId) {
+                $storeIdsForItems = [(int) $activeStoreId];
+            }
+        }
+
+        return Item::with('storename')
+            ->whereIn('store_id', $storeIdsForItems)
+            ->orderBy('name');
     }
 
     protected function generateBarcodeAssets(?string $barCode = null): array
@@ -575,9 +648,7 @@ class StockController extends Controller
         $isSatelliteStore = $this->isSatelliteStockContext();
 
         $listsup = Supplier::where('status', 'Active')->orderBy('company')->get();
-        $getItemid = $isSatelliteStore
-            ? Item::with('storename')->where('status', 'Active')->orderBy('name')->get()
-            : Item::whereIn('store_id', $scopedStoreIds)->where('status', 'Active')->orderBy('name')->get();
+        $getItemid = $this->stockEntryItemsQuery($scopedStoreIds, $isSatelliteStore)->get();
         $getstoreId = Store::whereIn('id', $scopedStoreIds)->orderBy('name')->get();
 
         if ($isSatelliteStore) {
@@ -743,9 +814,9 @@ class StockController extends Controller
     return redirect()->route('stockEntry')->with('message_success', 'Stock entry submitted for approval. It will be added to inventory once approved by an authorized user.');
 }
 
-  public function deleteStockItem(string $id)
+  public function deleteStockItem(Request $request, string $id)
     {
-        if ($this->isSatelliteStockContext()) {
+        if ($this->pendingStockEntryUsesSatellite($request->query('source'))) {
             $entry = SatelliteStockEntry::findOrFail($id);
             $this->assertPendingSatelliteStockEntryInScope($entry);
             $entry->delete();
@@ -755,17 +826,20 @@ class StockController extends Controller
             $stock->delete();
         }
 
-        return redirect()->route('stockEntry')->with('message_success', 'Pending stock entry deleted successfully.');
+        return redirect()->back()->with('message_success', 'Pending stock entry deleted successfully.');
     }
 
     //get stock details
-      public function getStockID($id)
+      public function getStockID(Request $request, $id)
     {
-        if ($this->isSatelliteStockContext()) {
+        if ($this->pendingStockEntryUsesSatellite($request->query('source'))) {
             $data = SatelliteStockEntry::findOrFail($id);
             $this->assertPendingSatelliteStockEntryInScope($data);
         } else {
             $data = Stock::findOrFail($id);
+            if ($data->status === 'pending') {
+                $this->assertPendingStockInScope($data);
+            }
         }
 
         return response()->json($data);
@@ -1066,11 +1140,7 @@ class StockController extends Controller
             ->get();
         $getstoreId = Store::whereIn('id', $scopedStoreIds)->orderBy('name')->get();
 
-        $liststock = Stock::with(['itemcode', 'itemname', 'supname', 'storename'])
-            ->whereIn('store_id', $scopedStoreIds)
-            ->where('status', 'pending')
-            ->orderByDesc('created_at')
-            ->get();
+        $liststock = $this->collectPendingStockEntriesForScope($scopedStoreIds);
 
         $pendingCount = $liststock->count();
         $totalQty = (int) $liststock->sum('qty');
@@ -1352,7 +1422,7 @@ class StockController extends Controller
 
         $pendingIssues = ItemIssue::with(['staffname', 'storename', 'itemname'])
             ->whereIn('store_id', $storeIds)
-            ->where('status', 'pending')
+            ->submittedForHodApproval()
             ->orderByDesc('created_at')
             ->get();
 
@@ -1387,7 +1457,7 @@ class StockController extends Controller
         $liststores = Store::all();
 
         $pendingIssues = ItemIssue::with(['staffname', 'storename', 'itemname'])
-            ->where('status', 'pending')
+            ->submittedForHodApproval()
             ->where('issue_to', $request->department)
             ->orderByDesc('created_at')
             ->get();
@@ -1438,7 +1508,7 @@ class StockController extends Controller
         foreach ($request->issue_id as $issueId) {
 
             $issue = ItemIssue::where('id', $issueId)
-                ->where('status', 'pending')
+                ->submittedForHodApproval()
                 ->first();
 
             if (!$issue) continue;
