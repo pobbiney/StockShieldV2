@@ -135,11 +135,19 @@ class ItemRequest extends Model
             return 0;
         }
 
-        return (int) ItemIssue::where('requisition_no', $this->requisition_no)
+        $centralQty = (int) ItemIssue::where('requisition_no', $this->requisition_no)
             ->where('item_id', $this->item_id)
             ->where('issue_to', $this->store_id)
             ->whereIn('status', $statuses)
             ->sum('qty');
+
+        $satelliteQty = (int) SatelliteItemIssue::where('requisition_no', $this->requisition_no)
+            ->where('item_id', $this->item_id)
+            ->where('issue_to', $this->store_id)
+            ->whereIn('status', $statuses)
+            ->sum('qty');
+
+        return $centralQty + $satelliteQty;
     }
 
     public function receivedQuantity(): int
@@ -156,11 +164,19 @@ class ItemRequest extends Model
             return 0;
         }
 
-        return (int) ItemIssue::where('requisition_no', $this->requisition_no)
+        $centralQty = (int) ItemIssue::where('requisition_no', $this->requisition_no)
             ->where('item_id', $this->item_id)
             ->where('issue_to', $this->store_id)
             ->where('status', 'received')
             ->sum('qty');
+
+        $satelliteQty = (int) SatelliteItemIssue::where('requisition_no', $this->requisition_no)
+            ->where('item_id', $this->item_id)
+            ->where('issue_to', $this->store_id)
+            ->where('status', 'received')
+            ->sum('qty');
+
+        return $centralQty + $satelliteQty;
     }
 
     public function issuedAt(): ?\Illuminate\Support\Carbon

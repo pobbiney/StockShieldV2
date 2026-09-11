@@ -10,6 +10,7 @@ class SatelliteStockReceipt extends Model
 
     protected $fillable = [
         'item_issue_id',
+        'satellite_item_issue_id',
         'satellite_stock_entry_id',
         'source_type',
         'item_request_id',

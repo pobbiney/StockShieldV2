@@ -11,9 +11,9 @@
             'uom' => optional($item->unitname)->name ?? '',
         ];
     })->values();
-    $centralLabel = $centralStores->isNotEmpty()
+    $centralLabel = $fulfillmentLabel ?? ($centralStores->isNotEmpty()
         ? $centralStores->pluck('name')->join(', ')
-        : 'Central Stores';
+        : 'Central Stores');
 @endphp
 
 @extends('layouts.backendapp')
@@ -676,9 +676,14 @@
             <div class="row align-items-end g-3">
                 <div class="col-lg-8">
                     <div class="req-hero-badge">
-                        <i class="bi bi-arrow-left-right"></i> Satellite → Central Requisition
+                        <i class="bi bi-arrow-left-right"></i>
+                        @if($routesToHub ?? false)
+                            Satellite → Hub Requisition
+                        @else
+                            Satellite → Central Requisition
+                        @endif
                     </div>
-                    <h2>Request Stock from Central</h2>
+                    <h2>@if($routesToHub ?? false) Request Stock from Hub @else Request Stock from Central @endif</h2>
                     <p>Build requisition drafts from central stock and submit for approval when ready.</p>
                     @if($activeStore)
                     <div class="store-context-banner">

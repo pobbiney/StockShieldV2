@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ItemIssue;
+use App\Models\SatelliteItemIssue;
 use App\Models\ItemRequest;
 use App\Models\ReturnItem;
 use App\Models\StockReversal;
@@ -198,12 +199,19 @@ class NotificationService
 
             self::TYPE_ISSUE_PENDING_APPROVAL => !ItemIssue::where('requisition_no', $referenceId)
                 ->where('status', 'pending')
-                ->exists(),
+                ->exists()
+                && !SatelliteItemIssue::where('requisition_no', $referenceId)
+                    ->where('status', 'pending')
+                    ->exists(),
 
             self::TYPE_ISSUE_APPROVED => !ItemIssue::where('requisition_no', $referenceId)
                 ->where('status', 'issued')
                 ->where('status_two', 'issued')
-                ->exists(),
+                ->exists()
+                && !SatelliteItemIssue::where('requisition_no', $referenceId)
+                    ->where('status', 'issued')
+                    ->where('status_two', 'issued')
+                    ->exists(),
 
             self::TYPE_STOCK_PENDING_APPROVAL => !Stock::where('batch_number', $referenceId)
                     ->where('status', 'pending')

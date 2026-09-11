@@ -1625,6 +1625,7 @@ Swal.fire({
     const dismissedToastIds = new Set(
         JSON.parse(sessionStorage.getItem(dismissedToastKey) || '[]')
     );
+    const TOAST_AUTO_HIDE_MS = 10000;
 
     function escapeHtml(text) {
         const div = document.createElement('div');
@@ -1686,10 +1687,39 @@ Swal.fire({
         sessionStorage.setItem(dismissedToastKey, JSON.stringify(Array.from(dismissedToastIds)));
     }
 
+    function clearToastAutoHide(toast) {
+        if (toast && toast._autoHideTimer) {
+            clearTimeout(toast._autoHideTimer);
+            toast._autoHideTimer = null;
+        }
+    }
+
+    function scheduleToastAutoHide(toast) {
+        clearToastAutoHide(toast);
+        if (!toast) {
+            return;
+        }
+
+        toast._autoHideTimer = setTimeout(function () {
+            dismissToast(toast, true);
+        }, TOAST_AUTO_HIDE_MS);
+    }
+
+    function openNotificationsPanel() {
+        const offcanvasEl = document.getElementById('view-notification');
+        if (!offcanvasEl || typeof bootstrap === 'undefined') {
+            return;
+        }
+
+        bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl).show();
+    }
+
     function dismissToast(toast, rememberDismissal) {
         if (!toast || toast.classList.contains('ss-toast-exit')) {
             return;
         }
+
+        clearToastAutoHide(toast);
 
         if (rememberDismissal && toast.dataset.notifId) {
             dismissedToastIds.add(toast.dataset.notifId);
@@ -1750,7 +1780,17 @@ Swal.fire({
             dismissToast(toast, true);
         });
 
+        toast.addEventListener('click', function (e) {
+            if (e.target.closest('.ss-toast-close') || e.target.closest('.ss-toast-open')) {
+                return;
+            }
+
+            e.preventDefault();
+            openNotificationsPanel();
+        });
+
         stack.prepend(toast);
+        scheduleToastAutoHide(toast);
 
         if (playSound) {
             playNotificationSound();
@@ -1965,6 +2005,10 @@ Swal.fire({
         Notification.requestPermission().then(function () {
             refreshDesktopPermissionBanner();
         });
+    });
+
+    $('#notificationBellBtn').on('click', function () {
+        loadActionNotifications();
     });
 
     $('#view-notification').on('show.bs.offcanvas', function () {

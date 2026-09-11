@@ -466,6 +466,32 @@
         </div>
     </div>
 
+    <div class="store-shell mb-4">
+        <div class="store-shell-head">
+            <h5><i class="bi bi-diagram-3 me-2 text-primary"></i>Requisition hub store</h5>
+            <p class="text-secondary small mb-0">Satellite stores flagged “Route to hub” send requisitions here for approval and issuing.</p>
+        </div>
+        <div class="store-shell-body">
+            <form method="POST" action="{{ route('set-requisition-hub') }}" class="row g-3 align-items-end">
+                @csrf
+                <div class="col-md-8">
+                    <label class="form-label small fw-semibold" for="hub_store_id">Hub satellite store</label>
+                    <select class="form-select" name="hub_store_id" id="hub_store_id">
+                        <option value="">— None —</option>
+                        @foreach($satelliteStores ?? collect() as $sat)
+                            <option value="{{ $sat->id }}" @selected(($requisitionHub->id ?? null) == $sat->id)>{{ $sat->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn-create-store w-100 justify-content-center">
+                        <i class="bi bi-check2"></i> Save hub
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="row g-4 align-items-start">
         {{-- Create form --}}
         <div class="col-lg-5">
@@ -556,7 +582,14 @@
                                     @foreach ($list as $store)
                                         <tr>
                                             <td class="text-secondary">{{ $loop->iteration }}</td>
-                                            <td class="store-name-cell">{{ $store->name }}</td>
+                                            <td class="store-name-cell">
+                                                {{ $store->name }}
+                                                @if($store->is_requisition_hub)
+                                                    <span class="store-badge group-central ms-1"><i class="bi bi-star-fill"></i> Hub</span>
+                                                @elseif($store->route_requisitions_to_hub)
+                                                    <span class="store-badge group-satellite ms-1"><i class="bi bi-signpost-split"></i> Routes to hub</span>
+                                                @endif
+                                            </td>
                                             <td>
                                                 @if($store->store_group === 'central')
                                                     <span class="store-badge group-central"><i class="bi bi-building"></i> Central</span>
@@ -578,7 +611,9 @@
                                                     data-id="{{ $store->id }}"
                                                     data-name="{{ $store->name }}"
                                                     data-status="{{ $store->status }}"
-                                                    data-group="{{ $store->store_group ?? '' }}">
+                                                    data-group="{{ $store->store_group ?? '' }}"
+                                                    data-route-hub="{{ $store->route_requisitions_to_hub ? '1' : '0' }}"
+                                                    data-is-hub="{{ $store->is_requisition_hub ? '1' : '0' }}">
                                                     <i class="bi bi-pencil-fill"></i>
                                                 </button>
                                             </td>
@@ -640,8 +675,30 @@ document.addEventListener('click', function (e) {
     document.getElementById('edit_store_status').value = btn.dataset.status || 'Active';
     document.getElementById('edit_store_group').value = btn.dataset.group || '';
 
+    const routeCheckbox = document.getElementById('edit_route_requisitions_to_hub');
+    const routeWrap = document.getElementById('edit_route_to_hub_wrap');
+    const isHub = btn.dataset.isHub === '1';
+    const isSatellite = btn.dataset.group === 'satellite';
+
+    routeCheckbox.checked = btn.dataset.routeHub === '1';
+    routeCheckbox.disabled = !isSatellite || isHub;
+    routeWrap.classList.toggle('d-none', !isSatellite || isHub);
+
     const modalEl = document.getElementById('editStoreModal');
     bootstrap.Modal.getOrCreateInstance(modalEl).show();
+});
+
+document.getElementById('edit_store_group')?.addEventListener('change', function () {
+    const routeCheckbox = document.getElementById('edit_route_requisitions_to_hub');
+    const routeWrap = document.getElementById('edit_route_to_hub_wrap');
+    const isSatellite = this.value === 'satellite';
+    routeWrap.classList.toggle('d-none', !isSatellite);
+    if (!isSatellite) {
+        routeCheckbox.checked = false;
+        routeCheckbox.disabled = true;
+    } else {
+        routeCheckbox.disabled = false;
+    }
 });
 </script>
 @endsection

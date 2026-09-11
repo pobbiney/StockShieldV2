@@ -116,6 +116,9 @@ class SettingsController extends Controller
     {
         $list = Store::orderBy('name')->get();
 
+        $satelliteStores = $list->where('store_group', 'satellite')->where('status', 'Active')->values();
+        $requisitionHub = Store::requisitionHub();
+
         return view('settings.store', [
             'list' => $list,
             'totalStores' => $list->count(),
@@ -123,6 +126,8 @@ class SettingsController extends Controller
             'inactiveCount' => $list->where('status', 'Inactive')->count(),
             'centralCount' => $list->where('store_group', 'central')->count(),
             'satelliteCount' => $list->where('store_group', 'satellite')->count(),
+            'satelliteStores' => $satelliteStores,
+            'requisitionHub' => $requisitionHub,
         ]);
     }
      public function getstoreID($id)
@@ -160,9 +165,45 @@ class SettingsController extends Controller
             $insertCat->name = trim($request->name);
             $insertCat->status = $request->status;
             $insertCat->store_group = $request->store_group;
-            
+
+            if ($insertCat->store_group !== 'satellite') {
+                $insertCat->route_requisitions_to_hub = false;
+                if ($insertCat->is_requisition_hub) {
+                    $insertCat->is_requisition_hub = false;
+                }
+            } elseif ($insertCat->is_requisition_hub) {
+                $insertCat->route_requisitions_to_hub = false;
+            } else {
+                $insertCat->route_requisitions_to_hub = $request->boolean('route_requisitions_to_hub');
+            }
+
             $insertCat = $insertCat->save();
             return $insertCat ? back()->with('message_success','Store updated successfully') : back()->with('message_error','Something went wrong, please try again.');
+    }
+
+    public function setRequisitionHub(Request $request)
+    {
+        $request->validate([
+            'hub_store_id' => 'nullable|exists:stores,id',
+        ]);
+
+        Store::query()->update(['is_requisition_hub' => false]);
+
+        $hubId = $request->input('hub_store_id');
+
+        if ($hubId) {
+            $hub = Store::find($hubId);
+
+            if (!$hub || $hub->store_group !== 'satellite' || $hub->status !== 'Active') {
+                return back()->with('message_error', 'Requisition hub must be an active satellite store.');
+            }
+
+            $hub->is_requisition_hub = true;
+            $hub->route_requisitions_to_hub = false;
+            $hub->save();
+        }
+
+        return back()->with('message_success', $hubId ? 'Requisition hub store updated.' : 'Requisition hub cleared.');
     }
 
     public function getWardView()

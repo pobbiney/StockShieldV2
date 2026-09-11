@@ -7,13 +7,17 @@ use App\Models\ApproveStock;
 use App\Models\Item;
 use App\Models\ItemIssue;
 use App\Models\ItemRequest;
+use App\Models\SatelliteItemIssue;
+use App\Models\SatelliteStockReceipt;
 use App\Models\ReturnItem;
 use App\Models\SatelliteIssueRequest;
 use App\Models\Stock;
 use App\Models\Store;
 use App\Models\UnitOfMeasure;
 use App\Services\NotificationService;
+use App\Services\RequisitionFulfillmentService;
 use App\Services\StoreContext;
+use RuntimeException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
@@ -23,7 +27,8 @@ class RequisitionController extends Controller
 {
     public function __construct(
         protected StoreContext $storeContext,
-        protected NotificationService $notifications
+        protected NotificationService $notifications,
+        protected RequisitionFulfillmentService $requisitionFulfillment
     ) {}
 
     protected function resolveActiveStoreId(): ?int
@@ -123,11 +128,19 @@ class RequisitionController extends Controller
                 ];
             });
 
-        $centralTransfers = ItemIssue::with(['issuefrom', 'staffname', 'authorised'])
+        $centralTransferLines = ItemIssue::with(['issuefrom', 'staffname', 'authorised'])
             ->where('issue_to', $activeStoreId)
             ->awaitingReceipt()
             ->orderByDesc('updated_at')
-            ->get()
+            ->get();
+
+        $satelliteTransferLines = SatelliteItemIssue::with(['issuefrom', 'staffname', 'authorised'])
+            ->where('issue_to', $activeStoreId)
+            ->awaitingReceipt()
+            ->orderByDesc('updated_at')
+            ->get();
+
+        $centralTransfers = $centralTransferLines->concat($satelliteTransferLines)
             ->groupBy('requisition_no')
             ->map(function ($lines) {
                 $first = $lines->first();
@@ -184,14 +197,22 @@ class RequisitionController extends Controller
             ? Store::whereIn('id', $centralStoreIds)->orderBy('name')->get()
             : collect();
 
+        $fulfillmentLabel = $activeStore
+            ? $this->requisitionFulfillment->fulfillmentLabelForRequestingStore($activeStore)
+            : 'Central Stores';
+        $routesToHub = $activeStore && $this->requisitionFulfillment->shouldRouteToHub($activeStore);
+
         return view('requisition.Requisition', [
-            'getItemid'         => $getItemid,
-            'listitemissue'     => $cartItems,
-            'activeStore'       => $activeStore,
-            'centralStores'     => $centralStores,
-            'pendingCount'      => $pendingCount,
-            'totalQtyRequested' => $totalQtyRequested,
-            'uniqueItems'       => $uniqueItems,
+            'getItemid'          => $getItemid,
+            'listitemissue'      => $cartItems,
+            'activeStore'        => $activeStore,
+            'centralStores'      => $centralStores,
+            'fulfillmentLabel'   => $fulfillmentLabel,
+            'routesToHub'        => $routesToHub,
+            'requisitionHub'     => $routesToHub ? $this->requisitionFulfillment->hubStore() : null,
+            'pendingCount'       => $pendingCount,
+            'totalQtyRequested'  => $totalQtyRequested,
+            'uniqueItems'        => $uniqueItems,
         ]);
     }
 
@@ -217,40 +238,27 @@ class RequisitionController extends Controller
             );
         }
 
-        $centralStoreIds = $this->centralStoreIds();
+        $activeStore = Store::find($activeStoreId);
 
-        $stockQuery = DB::table('approve_stocks')
-            ->where('item_id', $item->id)
-            ->where('qty', '>', 0)
-            ->where('status', 'approved')
-            ->whereDate('expiry_date', '>=', now());
-
-        if (!empty($centralStoreIds)) {
-            $stockQuery->whereIn('store_id', $centralStoreIds);
+        if (!$activeStore) {
+            return redirect()->route('choose-store');
         }
 
-        $stock = $stockQuery
-            ->orderBy('expiry_date', 'ASC')
-            ->first();
-
-        $itemStoreId = $stock->store_id ?? ($centralStoreIds[0] ?? (int) $item->store_id);
-
-        if (!$itemStoreId) {
-            return redirect()->route('Requisition')->with(
-                'message_error',
-                'No central store is configured for this requisition.'
-            );
+        try {
+            $lineMeta = $this->requisitionFulfillment->resolveLineMetadata($activeStore, $item);
+        } catch (RuntimeException $e) {
+            return redirect()->route('Requisition')->with('message_error', $e->getMessage());
         }
 
         try {
             ItemRequest::create([
-                'stock_id'      => $stock->stock_id ?? 0,
+                'stock_id'      => $lineMeta['stock_id'],
                 'item_id'       => $item->id,
-                'batch_number'  => $stock->batch_number ?? null,
+                'batch_number'  => $lineMeta['batch_number'],
                 'qty_requested' => (int) $request->quantity,
                 'qty_issued'    => 0,
-                'amount'        => $stock->amount ?? null,
-                'item_store_id' => (int) $itemStoreId,
+                'amount'        => $lineMeta['amount'],
+                'item_store_id' => $lineMeta['item_store_id'],
                 'store_id'      => $activeStoreId,
                 'created_by'    => Auth::id(),
             ]);
@@ -369,7 +377,10 @@ class RequisitionController extends Controller
             ->where('status', 'pending request')
             ->when(
                 !$this->storeContext->hasGlobalStoreAccess(),
-                fn ($query) => $query->whereIn('store_id', $storeIds)
+                fn ($query) => $query->where(function ($scoped) use ($storeIds) {
+                    $scoped->whereIn('store_id', $storeIds)
+                        ->orWhereIn('item_store_id', $storeIds);
+                })
             )
             ->orderByDesc('created_at')
             ->get();
@@ -406,7 +417,10 @@ class RequisitionController extends Controller
             ->where('status', 'pending request')
             ->when(
                 !$this->storeContext->hasGlobalStoreAccess(),
-                fn ($query) => $query->whereIn('store_id', $storeIds)
+                fn ($query) => $query->where(function ($scoped) use ($storeIds) {
+                    $scoped->whereIn('store_id', $storeIds)
+                        ->orWhereIn('item_store_id', $storeIds);
+                })
             )
             ->orderByDesc('id')
             ->get();
@@ -834,7 +848,7 @@ class RequisitionController extends Controller
         $listdept = $this->storeContext->getScopedStoreIds();
         $decodeID = Crypt::decrypt($requisition_no);
 
-        $listissues = ItemIssue::with(['staffname', 'storename', 'itemcode', 'itemname.unitname', 'issuefrom'])
+        $centralIssues = ItemIssue::with(['staffname', 'storename', 'itemcode', 'itemname.unitname', 'issuefrom'])
             ->whereIn('store_id', $listdept)
             ->where('requisition_no', $decodeID)
             ->submittedForHodApproval()
@@ -842,7 +856,17 @@ class RequisitionController extends Controller
             ->orderBy('id')
             ->get();
 
-        $batchNumbers = $listissues->pluck('batch_number')->unique();
+        $satelliteIssues = SatelliteItemIssue::with(['staffname', 'storename', 'itemcode', 'itemname.unitname', 'issuefrom', 'satelliteStockReceipt'])
+            ->whereIn('store_id', $listdept)
+            ->where('requisition_no', $decodeID)
+            ->submittedForHodApproval()
+            ->orderBy('batch_number')
+            ->orderBy('id')
+            ->get();
+
+        $listissues = $centralIssues->concat($satelliteIssues);
+
+        $batchNumbers = $centralIssues->pluck('batch_number')->unique();
 
         $itembalance = ApproveStock::whereIn('batch_number', $batchNumbers)
             ->get()
@@ -852,11 +876,20 @@ class RequisitionController extends Controller
             $first = $lines->first();
 
             $batchLines = $lines->map(function ($issue) use ($itembalance) {
+                $issueKey = $issue instanceof SatelliteItemIssue ? 's'.$issue->id : (string) $issue->id;
+                $balance = 0;
+
+                if ($issue instanceof SatelliteItemIssue) {
+                    $balance = (int) ($issue->satelliteStockReceipt->qty ?? 0);
+                } else {
+                    $balance = (int) ($itembalance[$issue->batch_number]->qty ?? 0);
+                }
+
                 return (object) [
-                    'issue_id'     => $issue->id,
+                    'issue_id'     => $issueKey,
                     'batch_number' => $issue->batch_number,
                     'prepared_qty' => (int) $issue->qty,
-                    'balance'      => (int) ($itembalance[$issue->batch_number]->qty ?? 0),
+                    'balance'      => $balance,
                     'amount'       => (float) ($issue->amount ?? 0),
                 ];
             })->values();
