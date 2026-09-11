@@ -109,12 +109,11 @@ class ReportController extends Controller
     public function printReceivedStockReport($department)
 {
 
-    $liststock = Stock::where('store_id', $department)
-        ->where(function($query) {
-
+    $liststock = Stock::with(['itemname.unitname', 'supname', 'staffname'])
+        ->where('store_id', $department)
+        ->where(function ($query) {
             $query->where('status', 'pending')
-                  ->orWhere('status', 'approved');
-
+                ->orWhere('status', 'approved');
         })
         ->orderBy('id', 'DESC')
         ->get();

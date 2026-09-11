@@ -405,11 +405,8 @@
                     </div>
                     <h2>Awaiting Approval</h2>
                     <p>
-                        @if($requiresApproval)
-                            Stock entries you submitted that are still pending review. You can edit or remove them until an approver accepts them.
-                        @else
-                            Pending stock entries across your accessible stores before they move into active inventory.
-                        @endif
+                        All stock entries awaiting approval in your store scope — central and satellite.
+                        You can edit or delete any line that is still pending and not yet approved.
                     </p>
                 </div>
                 <div class="col-lg-5 d-flex flex-column align-items-lg-end gap-3">
@@ -545,6 +542,9 @@
                                     ?? '—';
                                 $storeName = optional($lists->storename)->name ?? '—';
                                 $lineTotal = (float) $lists->qty * (float) $lists->amount;
+                                $entrySource = $lists->entry_source ?? 'central';
+                                $stockIdUrl = route('stock-id', ['id' => $lists->id, 'source' => $entrySource]);
+                                $deleteUrl = url('stockEntry/'.$lists->id.'/delete?source='.$entrySource);
                             @endphp
                             <tr>
                                 <td class="text-muted">{{ $loop->iteration }}</td>
@@ -564,14 +564,14 @@
                                 <td class="text-end text-nowrap">
                                     <button type="button"
                                             class="btn-action edit showmodal me-1"
-                                            title="Edit"
-                                            data-url="{{ route('stock-id', $lists->id) }}">
+                                            title="Edit pending entry"
+                                            data-url="{{ $stockIdUrl }}">
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <a class="btn-action delete"
-                                       title="Delete"
-                                       onclick="return confirm('Delete pending entry for {{ addslashes($itemName) }}?')"
-                                       href="{{ url('stockEntry/'.$lists->id.'/delete') }}">
+                                       title="Delete pending entry"
+                                       onclick="return confirm('Delete this pending entry for {{ addslashes($itemName) }}? It has not been approved yet.')"
+                                       href="{{ $deleteUrl }}">
                                         <i class="bi bi-trash"></i>
                                     </a>
                                 </td>

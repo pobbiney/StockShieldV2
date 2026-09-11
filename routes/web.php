@@ -17,6 +17,7 @@ use App\Http\Controllers\Stock\StockController;
 use App\Http\Controllers\Stock\StockReceiptController;
 use App\Http\Controllers\Stock\SatelliteIssueController;
 use App\Http\Controllers\Stock\ReverseEntryController;
+use App\Http\Controllers\RejectedItemsController;
  
 
 /*  Frontend */
@@ -286,7 +287,8 @@ Route::get('Requisition/{id}/delete', [RequisitionController::class, 'deleteitem
 Route::get('/submit-all-requests', [RequisitionController::class, 'submitRequest'])
     ->name('requisition.SubmitRequest');
 Route::get('MyRequest',[RequisitionController::class,'getMyRequestView'])->name('MyRequest'); 
-Route::get('ApproveRequest',[RequisitionController::class,'getApproveRequestView'])->name('ApproveRequest'); 
+Route::get('ApproveRequest',[RequisitionController::class,'getApproveRequestView'])->name('ApproveRequest');
+Route::get('RejectedItems', [RejectedItemsController::class, 'index'])->name('RejectedItems'); 
 Route::get('viewRequest/{requisition_no}',[RequisitionController::class,'getviewRequest'])->name('viewRequest');
 Route::get('request-item-id/{id}',[RequisitionController::class,'getrequesttemID'])->name('request-item-id');
 Route::post('add-reject-request-process', [RequisitionController::class, 'addItemRejectRequest'])->name('add-reject-request-process');

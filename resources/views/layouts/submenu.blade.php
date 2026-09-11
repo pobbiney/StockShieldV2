@@ -83,34 +83,63 @@
         text-decoration: none;
         color: inherit;
         border-radius: 1rem;
-        background: var(--adminuiux-card-bg, #fff);
-        border: 1px solid rgba(0, 0, 0, 0.06);
+        background: linear-gradient(
+            145deg,
+            rgba(var(--card-accent-rgb, 13, 110, 253), 0.08) 0%,
+            var(--adminuiux-card-bg, #fff) 55%
+        );
+        border: 1px solid rgba(var(--card-accent-rgb, 13, 110, 253), 0.18);
         padding: 2rem 1.5rem;
         min-height: 180px;
         transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
         overflow: hidden;
         height: 100%;
+        box-shadow: 0 4px 18px rgba(var(--card-accent-rgb, 13, 110, 253), 0.08);
+    }
+
+    .submenu-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(
+            90deg,
+            rgb(var(--card-accent-rgb, 13, 110, 253)),
+            rgba(var(--card-accent-rgb, 13, 110, 253), 0.45)
+        );
+        border-radius: 1rem 1rem 0 0;
     }
 
     [data-theme="theme-dark"] .submenu-card,
     .adminuiux-header-standard.theme-dark .submenu-card {
-        border-color: rgba(255, 255, 255, 0.08);
+        border-color: rgba(var(--card-accent-rgb, 13, 110, 253), 0.28);
+        background: linear-gradient(
+            145deg,
+            rgba(var(--card-accent-rgb, 13, 110, 253), 0.14) 0%,
+            rgba(255, 255, 255, 0.04) 55%
+        );
     }
 
     .submenu-card::after {
         content: '';
         position: absolute;
         inset: 0;
-        background: linear-gradient(135deg, transparent 60%, rgba(var(--card-accent-rgb, 13, 110, 253), 0.06));
-        opacity: 0;
+        background: radial-gradient(
+            circle at 100% 0%,
+            rgba(var(--card-accent-rgb, 13, 110, 253), 0.14) 0%,
+            transparent 55%
+        );
+        opacity: 0.65;
         transition: opacity 0.25s ease;
         pointer-events: none;
     }
 
     .submenu-card:hover {
         transform: translateY(-6px);
-        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.1);
-        border-color: rgba(var(--card-accent-rgb, 13, 110, 253), 0.25);
+        box-shadow: 0 18px 42px rgba(var(--card-accent-rgb, 13, 110, 253), 0.22);
+        border-color: rgba(var(--card-accent-rgb, 13, 110, 253), 0.45);
         color: inherit;
     }
 
@@ -119,6 +148,8 @@
     }
 
     .submenu-card-icon {
+        position: relative;
+        z-index: 1;
         width: 52px;
         height: 52px;
         border-radius: 0.875rem;
@@ -127,40 +158,57 @@
         justify-content: center;
         font-size: 1.35rem;
         margin-bottom: 1rem;
-        background: rgba(var(--card-accent-rgb, 13, 110, 253), 0.12);
+        background: linear-gradient(
+            135deg,
+            rgba(var(--card-accent-rgb, 13, 110, 253), 0.22),
+            rgba(var(--card-accent-rgb, 13, 110, 253), 0.08)
+        );
         color: rgb(var(--card-accent-rgb, 13, 110, 253));
-        transition: transform 0.25s ease, background 0.25s ease;
+        border: 1px solid rgba(var(--card-accent-rgb, 13, 110, 253), 0.2);
+        transition: transform 0.25s ease, background 0.25s ease, color 0.25s ease;
     }
 
     .submenu-card:hover .submenu-card-icon {
         transform: scale(1.08);
-        background: rgba(var(--card-accent-rgb, 13, 110, 253), 0.18);
+        background: rgb(var(--card-accent-rgb, 13, 110, 253));
+        color: #fff;
+        border-color: transparent;
+        box-shadow: 0 8px 20px rgba(var(--card-accent-rgb, 13, 110, 253), 0.35);
     }
 
     .submenu-card-title {
+        position: relative;
+        z-index: 1;
         font-size: 0.95rem;
-        font-weight: 600;
+        font-weight: 700;
         margin-bottom: 0.35rem;
         line-height: 1.35;
-        color: var(--adminuiux-content-color, #212529);
+        color: rgb(var(--card-accent-rgb, 13, 110, 253));
+    }
+
+    .submenu-card-desc {
+        position: relative;
+        z-index: 1;
     }
 
     .submenu-card-arrow {
         position: absolute;
         bottom: 1.25rem;
         right: 1.25rem;
+        z-index: 1;
         width: 28px;
         height: 28px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(var(--card-accent-rgb, 13, 110, 253), 0.1);
-        color: rgb(var(--card-accent-rgb, 13, 110, 253));
+        background: rgb(var(--card-accent-rgb, 13, 110, 253));
+        color: #fff;
         font-size: 0.75rem;
         opacity: 0;
         transform: translateX(-6px);
         transition: opacity 0.25s ease, transform 0.25s ease;
+        box-shadow: 0 4px 12px rgba(var(--card-accent-rgb, 13, 110, 253), 0.35);
     }
 
     .submenu-card:hover .submenu-card-arrow {
@@ -168,12 +216,16 @@
         transform: translateX(0);
     }
 
-    .submenu-card-accent-0 { --card-accent-rgb: 13, 110, 253; }
-    .submenu-card-accent-1 { --card-accent-rgb: 102, 16, 242; }
-    .submenu-card-accent-2 { --card-accent-rgb: 25, 135, 84; }
-    .submenu-card-accent-3 { --card-accent-rgb: 253, 126, 20; }
-    .submenu-card-accent-4 { --card-accent-rgb: 220, 53, 69; }
-    .submenu-card-accent-5 { --card-accent-rgb: 13, 202, 240; }
+    .submenu-card-accent-0 { --card-accent-rgb: 37, 99, 235; }   /* blue */
+    .submenu-card-accent-1 { --card-accent-rgb: 124, 58, 237; }  /* violet */
+    .submenu-card-accent-2 { --card-accent-rgb: 5, 150, 105; }   /* emerald */
+    .submenu-card-accent-3 { --card-accent-rgb: 234, 88, 12; }   /* orange */
+    .submenu-card-accent-4 { --card-accent-rgb: 220, 38, 38; }   /* red */
+    .submenu-card-accent-5 { --card-accent-rgb: 8, 145, 178; }   /* cyan */
+    .submenu-card-accent-6 { --card-accent-rgb: 217, 119, 6; }    /* amber */
+    .submenu-card-accent-7 { --card-accent-rgb: 190, 24, 93; }   /* pink */
+    .submenu-card-accent-8 { --card-accent-rgb: 79, 70, 229; }   /* indigo */
+    .submenu-card-accent-9 { --card-accent-rgb: 22, 163, 74; }   /* green */
 
     .submenu-card-animate {
         opacity: 0;
@@ -271,13 +323,13 @@
         <div class="submenu-grid">
             @foreach($submenus as $submenu)
                 <a href="{{ route($submenu->link_url) }}"
-                   class="submenu-card submenu-card-accent-{{ $loop->index % 6 }} submenu-card-animate"
+                   class="submenu-card submenu-card-accent-{{ $loop->index % 10 }} submenu-card-animate"
                    style="animation-delay: {{ $loop->index * 0.06 }}s">
                     <div class="submenu-card-icon">
                         <i class="{{ $submenu->link_image ?? 'bi bi-box-arrow-up-right' }}"></i>
                     </div>
                     <div class="submenu-card-title">{{ $submenu->link_name }}</div>
-                    <p class="text-secondary small mb-0">Open module</p>
+                    <p class="text-secondary small mb-0 submenu-card-desc">Open module</p>
                     <span class="submenu-card-arrow">
                         <i class="bi bi-arrow-right"></i>
                     </span>

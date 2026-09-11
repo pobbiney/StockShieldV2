@@ -64,6 +64,11 @@ class SatelliteStockEntry extends Model
         return $this->belongsTo(User::class, 'created_by', 'id');
     }
 
+    public function rejectedByUser()
+    {
+        return $this->belongsTo(User::class, 'rejected_by', 'id');
+    }
+
     public function satelliteStockReceipt()
     {
         return $this->hasOne(SatelliteStockReceipt::class, 'satellite_stock_entry_id');

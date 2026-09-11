@@ -389,66 +389,82 @@ tbody td:last-child { padding-right: 10px; }
   }
 
   @media print {
-  .print-bar {
-    display: none !important;
-  }
+    .print-bar {
+      display: none !important;
+    }
 
-   html, body {
-    font-size: 16pt !important;
-    transform: scale(1) !important;
-    transform-origin: top left !important;
-  }
-   body {
-    width: 100% !important;
-    min-width: 1200px !important;
-  }
-  
-}
+    html, body {
+      width: 100% !important;
+      min-width: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      font-size: 9pt !important;
+      background: #fff !important;
+    }
 
-   
+    .page {
+      max-width: none !important;
+      box-shadow: none !important;
+    }
 
-    /* Force background colors to print */
-    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .table-section {
+      overflow: visible !important;
+    }
+
+    table {
+      width: 100% !important;
+      table-layout: fixed;
+      font-size: 7.5pt !important;
+      border-collapse: collapse;
+    }
+
+    thead th {
+      font-size: 6.5pt !important;
+      padding: 4px 3px !important;
+      white-space: normal !important;
+      word-break: break-word;
+      line-height: 1.2;
+    }
+
+    tbody td {
+      font-size: 7.5pt !important;
+      padding: 4px 3px !important;
+      white-space: normal !important;
+      word-break: break-word;
+      line-height: 1.25;
+      vertical-align: top;
+    }
+
+    tfoot td {
+      font-size: 7.5pt !important;
+      padding: 5px 3px !important;
+      white-space: nowrap !important;
+    }
+
+    .header {
+      padding: 16px 20px !important;
+    }
+
+    .org-name { font-size: 18px !important; }
+    .report-title { font-size: 20px !important; }
+
+    * {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
 
     .header { background: var(--ink) !important; }
     .meta-bar { background: var(--accent) !important; }
     .table-header-bar { background: var(--ink) !important; }
     thead tr { background: var(--accent-light) !important; }
     tfoot tr { background: var(--ink) !important; }
-    .summary-title { background: var(--ink) !important; }
-    .summary-row:last-child { background: var(--accent) !important; }
     .footer { background: var(--bg) !important; }
+  }
 
-    @page {
-      margin: 10mm 12mm;
-      size: A4 landscape;
-    }
-
-    table {
-    font-size: 14px;
-    }
-
-    thead th {
-    font-size: 14px;
-    }
-
-    tbody td {
-    font-size: 15px;
-    }
-    thead th, tbody td {
-  white-space: nowrap;
-}
-tfoot td {
-  white-space: nowrap;
-}
-
-@page {
-  size: A4 landscape;
-}
-@page {
-  size: A3 landscape;
-}
-  
+  @page {
+    margin: 8mm 6mm;
+    size: A4 landscape;
+  }
 </style>
 </head>
 <body>
@@ -551,28 +567,41 @@ tfoot td {
   <!-- TABLE -->
   <div class="table-section">
     <div class="table-header-bar">Received Item Breakdown — Stock Items</div>
-    <table>
+    <table class="received-stock-print-table">
+      <colgroup>
+        <col style="width: 3%">
+        <col style="width: 7%">
+        <col style="width: 12%">
+        <col style="width: 5%">
+        <col style="width: 8%">
+        <col style="width: 9%">
+        <col style="width: 7%">
+        <col style="width: 8%">
+        <col style="width: 7%">
+        <col style="width: 8%">
+        <col style="width: 9%">
+        <col style="width: 6%">
+        <col style="width: 4%">
+        <col style="width: 7%">
+      </colgroup>
       <thead>
-        
-            <th>ID</th>
-            
+        <tr>
+            <th>#</th>
             <th>ITEM CODE</th>
-            <th >ITEM NAME</th>
+            <th>ITEM NAME</th>
             <th>UoM</th>
             <th>BATCH NO</th>
             <th>VENDOR</th>
             <th>PO</th>
-            <th>WAYBILL</th>
+            <th>WAYBILL REF.</th>
             <th>EXPIRY DATE</th>
-            <th>CONTRACT NO.</th>
-            {{-- <th>RECEIVED BY</th> --}}
+            <th>CONTRACT REF.</th>
+            <th>RECEIVED BY</th>
             <th>UNIT COST</th>
             <th>QTY</th>
-            
             <th>TOTAL AMOUNT</th>
-            
         </tr>
-    </thead>
+      </thead>
     <tbody>
             
                 @php  $grandTotal = 0; $totalqty = 0; @endphp
@@ -586,21 +615,19 @@ tfoot td {
             @endphp
             <tr>
                 <td>{{ $loop->iteration }}</td>
-                <td>{{ $lists->itemname->item_code }}</td>
-                <td>{{ $lists->itemname->name }}</td>
-                <td>{{ $lists->itemname->unitname->name ?? ''}}</td>
+                <td>{{ $lists->itemname->item_code ?? '' }}</td>
+                <td>{{ $lists->itemname->name ?? '' }}</td>
+                <td>{{ $lists->itemname->unitname->name ?? '' }}</td>
                 <td>{{ $lists->batch_number ?? '' }}</td>
-                
                 <td>{{ $lists->supname->company ?? '' }}</td>
-                <td>{{ $lists->purchase_order ?? ''}} </td>
-                <td>{{ $lists->waybill }}</td>
-                <td>{{ $lists->expiry_date }}</td>
-                <td>{{ $lists->award_letter }}</td>
-                {{-- <td>{{ $lists->staffname->name }}</td> --}}
-                <td>{{ $lists->amount ?? ''}}</td>
-                <td>{{ $lists->qty ?? ''}} </td>
-                
-                <td>{{ number_format($lineTotal,2)}}</td>
+                <td>{{ $lists->purchase_order ?? '' }}</td>
+                <td>{{ $lists->waybill ?? '' }}</td>
+                <td>{{ $lists->expiry_date ?? '' }}</td>
+                <td>{{ $lists->award_letter ?? '' }}</td>
+                <td>{{ $lists->staffname->name ?? '' }}</td>
+                <td>{{ $lists->amount ?? '' }}</td>
+                <td>{{ $lists->qty ?? '' }}</td>
+                <td>{{ number_format($lineTotal, 2) }}</td>
             </tr>
             @endforeach
              
@@ -608,10 +635,10 @@ tfoot td {
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="10"><span class="total-label">Grand Total</span></td>
+          <td colspan="11"><span class="total-label">Grand Total</span></td>
           <td></td>
           <td><strong>{{ $totalqty }}</strong></td>
-          <td><strong>GH₵ {{ number_format($grandTotal,2) }}</strong></td>
+          <td><strong>GH₵ {{ number_format($grandTotal, 2) }}</strong></td>
         </tr>
       </tfoot>
     </table>

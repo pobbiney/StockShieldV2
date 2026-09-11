@@ -144,6 +144,7 @@
         overflow: hidden;
         box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
         animation: statIn 0.5s ease 0.25s both;
+        background: #fff;
     }
 
     .mr-table-head {
@@ -197,7 +198,13 @@
     }
 
     #myRequestTable tbody tr:nth-child(even) { background: #fafafa; }
+    #myRequestTable tbody tr:nth-child(odd)  { background: #fff; }
     #myRequestTable tbody tr:hover { background: #f0fdfa !important; }
+
+    .mr-table-card .table-responsive,
+    .mr-table-card .dataTables_wrapper {
+        background: #fff;
+    }
 
     .code-badge {
         display: inline-block;
@@ -396,7 +403,7 @@
                     <div class="stat-card-icon"><i class="bi bi-box-seam"></i></div>
                 </div>
                 <div class="stat-card-value">{{ number_format($totalQtyIssued) }}<span style="font-size:1rem;color:#94a3b8"> / {{ number_format($totalQtyRequested) }}</span></div>
-                <p class="stat-card-label">Issued / Requested Qty</p>
+                <p class="stat-card-label">Total Issued / Requested</p>
                 <p class="stat-card-meta">{{ $issuedPct }}% overall fulfillment</p>
             </div>
         </div>
@@ -424,7 +431,9 @@
                             <th>Source Store</th>
                             <th>UoM</th>
                             <th>Req. Qty</th>
+                            <th>Total Qty</th>
                             <th>Issued Qty</th>
+                            <th>Total Issued</th>
                             <th>Date Requested</th>
                             <th>Date Issued</th>
                             <th>Status</th>
@@ -434,6 +443,9 @@
                         @foreach($listrequest as $row)
                             @php
                                 $issuedQty = $row->issuedQuantity();
+                                $reqMultiplier = $row->itemTotalQtyMultiplier();
+                                $totalReqQty = $row->effectiveRequestedQuantity();
+                                $totalIssuedQty = $row->effectiveIssuedQuantity();
                                 $issuedAt = $row->issuedAt();
                                 $statusClass = $row->statusClass();
                             @endphp
@@ -448,9 +460,21 @@
                                     <span class="source-store-badge">{{ $row->sourceStore->name ?? 'Central' }}</span>
                                 </td>
                                 <td>{{ $row->itemname->unitname->name ?? '—' }}</td>
-                                <td><span class="qty-requested">{{ $row->qty_requested }}</span></td>
+                                <td><span class="qty-requested">{{ number_format((int) $row->qty_requested) }}</span></td>
                                 <td>
-                                    <span class="qty-issued {{ $issuedQty > 0 ? '' : 'zero' }}">{{ $issuedQty }}</span>
+                                    <span class="qty-requested">{{ number_format($totalReqQty) }}</span>
+                                    @if($reqMultiplier && $totalReqQty !== (int) $row->qty_requested)
+                                        <span class="d-block date-time">{{ number_format((int) $row->qty_requested) }} × {{ number_format($reqMultiplier) }}</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    <span class="qty-issued {{ $issuedQty > 0 ? '' : 'zero' }}">{{ number_format($issuedQty) }}</span>
+                                </td>
+                                <td>
+                                    <span class="qty-issued {{ $totalIssuedQty > 0 ? '' : 'zero' }}">{{ number_format($totalIssuedQty) }}</span>
+                                    @if($reqMultiplier && $totalIssuedQty !== $issuedQty)
+                                        <span class="d-block date-time">{{ number_format($issuedQty) }} × {{ number_format($reqMultiplier) }}</span>
+                                    @endif
                                 </td>
                                 <td class="date-cell">
                                     {{ $row->created_at?->format('M d, Y') ?? '—' }}
@@ -500,7 +524,7 @@
 $(document).ready(function () {
     if ($('#myRequestTable').length && $.fn.DataTable) {
         $('#myRequestTable').DataTable({
-            order: [[7, 'desc']],
+            order: [[9, 'desc']],
             pageLength: 15,
             lengthMenu: [[10, 15, 25, 50, -1], [10, 15, 25, 50, 'All']],
             language: { search: '', searchPlaceholder: 'Search requests…' },

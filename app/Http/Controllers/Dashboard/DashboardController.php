@@ -46,6 +46,7 @@ class DashboardController extends Controller implements HasMiddleware
             : null;
 
         $isCentralStore = false;
+        $fulfillStoreIds = [];
         $incomingRequisitions = collect();
         $awaitingHodRequisitions = collect();
         $pendingRequisitionCount = 0;
@@ -69,6 +70,10 @@ class DashboardController extends Controller implements HasMiddleware
             $isCentralStore = true;
             $fulfillStoreIds = [(int) $activeStore->id];
         }
+
+        $pendingIssueApprovals = collect();
+        $pendingIssueApprovalCount = 0;
+        $pendingIssueApprovalLines = 0;
 
         if ($isCentralStore && !empty($fulfillStoreIds)) {
             $approvedRequests = ItemRequest::with(['storename', 'staffname'])
@@ -111,7 +116,42 @@ class DashboardController extends Controller implements HasMiddleware
             })->values();
 
             $awaitingHodCount = $awaitingHodRequisitions->count();
+
+            $pendingIssueQuery = ItemIssue::with(['storename', 'staffname'])
+                ->whereIn('store_id', $fulfillStoreIds)
+                ->submittedForHodApproval()
+                ->orderByDesc('created_at');
+
+            $pendingIssueApprovalLines = (clone $pendingIssueQuery)->count();
+
+            $pendingIssueApprovals = (clone $pendingIssueQuery)->get()
+                ->groupBy('requisition_no')
+                ->map(function ($lines) {
+                    $first = $lines->first();
+
+                    return (object) [
+                        'requisition_no'   => $first->requisition_no,
+                        'requesting_store' => $first->storename,
+                        'issued_by'        => $first->staffname,
+                        'line_count'       => $lines->count(),
+                        'total_qty'        => (int) $lines->sum('qty'),
+                        'submitted_at'     => $lines->min('created_at'),
+                    ];
+                })
+                ->values();
+
+            $pendingIssueApprovalCount = $pendingIssueApprovals->count();
         }
+
+        $authUser = Auth::user();
+        $canIssueStock = $authUser?->canAccessLinkRoute('IssueItem') ?? false;
+        $canApproveIssues = $authUser?->canAccessLinkRoute('IssueApproval') ?? false;
+        $canApproveRequisitions = $authUser?->canAccessLinkRoute('ApproveRequest') ?? false;
+        $canStockEntry = $authUser?->canAccessLinkRoute('stockEntry') ?? false;
+        $canPendingStock = $authUser?->canAccessLinkRoute('pendingStock') ?? false;
+        $canStockApprovalMenu = $authUser?->canAccessLinkRoute('stockApproval') ?? false;
+        $canManageItems = $authUser?->canAccessLinkRoute('Item') ?? false;
+        $canReorder = $authUser?->canAccessLinkRoute('reOrder') ?? false;
 
         $isSatelliteStore = $activeStore?->store_group === 'satellite';
         $incomingTransfers = collect();
@@ -156,6 +196,17 @@ class DashboardController extends Controller implements HasMiddleware
             'awaitingHodRequisitions' => $awaitingHodRequisitions,
             'pendingRequisitionCount' => $pendingRequisitionCount,
             'awaitingHodCount' => $awaitingHodCount,
+            'pendingIssueApprovals' => $pendingIssueApprovals,
+            'pendingIssueApprovalCount' => $pendingIssueApprovalCount,
+            'pendingIssueApprovalLines' => $pendingIssueApprovalLines,
+            'canIssueStock' => $canIssueStock,
+            'canApproveIssues' => $canApproveIssues,
+            'canApproveRequisitions' => $canApproveRequisitions,
+            'canStockEntry' => $canStockEntry,
+            'canPendingStock' => $canPendingStock,
+            'canStockApprovalMenu' => $canStockApprovalMenu,
+            'canManageItems' => $canManageItems,
+            'canReorder' => $canReorder,
             'isSatelliteStore' => $isSatelliteStore,
             'incomingTransfers' => $incomingTransfers,
             'pendingReceiptCount' => $pendingReceiptCount,

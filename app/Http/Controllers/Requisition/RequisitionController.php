@@ -343,8 +343,8 @@ class RequisitionController extends Controller
             ->get();
 
         $totalCount = $listrequest->count();
-        $totalQtyRequested = (int) $listrequest->sum('qty_requested');
-        $totalQtyIssued = (int) $listrequest->sum(fn (ItemRequest $row) => $row->issuedQuantity());
+        $totalQtyRequested = (int) $listrequest->sum(fn (ItemRequest $row) => $row->effectiveRequestedQuantity());
+        $totalQtyIssued = (int) $listrequest->sum(fn (ItemRequest $row) => $row->effectiveIssuedQuantity());
         $fulfilledCount = $listrequest->filter(fn (ItemRequest $row) => $row->fulfillmentStatus() === 'fulfilled')->count();
         $pendingCount = $listrequest->filter(fn (ItemRequest $row) => in_array($row->fulfillmentStatus(), ['pending', 'partial'], true))->count();
         $rejectedCount = $listrequest->filter(fn (ItemRequest $row) => $row->status === 'rejected')->count();
@@ -837,7 +837,7 @@ class RequisitionController extends Controller
         $listissues = ItemIssue::with(['staffname', 'storename', 'itemcode', 'itemname.unitname', 'issuefrom'])
             ->whereIn('store_id', $listdept)
             ->where('requisition_no', $decodeID)
-            ->where('status', 'pending')
+            ->submittedForHodApproval()
             ->orderBy('batch_number')
             ->orderBy('id')
             ->get();

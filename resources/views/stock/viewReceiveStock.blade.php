@@ -230,7 +230,9 @@
                                 <th>Item Code</th>
                                 <th>Item Name</th>
                                 <th>UoM</th>
+                                <th>Issuing Store</th>
                                 <th>Batches</th>
+                                <th>Issued Qty</th>
                                 <th>Qty to Accept</th>
                                 <th>Unit Cost</th>
                             </tr>
@@ -245,6 +247,7 @@
                                     <td><code>{{ $group->itemcode->item_code ?? '—' }}</code></td>
                                     <td class="fw-semibold">{{ $group->itemname->name ?? '—' }}</td>
                                     <td>{{ $group->itemname->unitname->name ?? '—' }}</td>
+                                    <td>{{ $group->issuing_store->name ?? ($centralStore->name ?? '—') }}</td>
                                     <td>
                                         @if($group->lines->count() > 1)
                                             <span class="batch-count-badge">
@@ -256,11 +259,22 @@
                                         @endforeach
                                         <div class="batch-breakdown">
                                             @foreach($group->lines as $line)
-                                                <span>{{ $line->batch_number }}: {{ $line->qty }}</span>
+                                                <span>{{ $line->batch_number }}: {{ number_format($line->qty) }} issued</span>
+                                                @if(($group->total_qty_multiplier ?? null) && $line->accept_qty !== $line->qty)
+                                                    <span class="ms-1">→ {{ number_format($line->accept_qty) }} units</span>
+                                                @endif
                                             @endforeach
                                         </div>
                                     </td>
-                                    <td><span class="qty-badge">{{ number_format($group->total_qty) }}</span></td>
+                                    <td>{{ number_format($group->issued_qty ?? $group->total_qty) }}</td>
+                                    <td>
+                                        <span class="qty-badge">{{ number_format($group->total_qty) }}</span>
+                                        @if(($group->total_qty_multiplier ?? null) && ($group->issued_qty ?? 0) !== $group->total_qty)
+                                            <div class="batch-breakdown mb-0 border-0 pt-1">
+                                                × {{ number_format($group->total_qty_multiplier) }} per pack
+                                            </div>
+                                        @endif
+                                    </td>
                                     <td>{{ number_format($avgCost ?? 0, 2) }}</td>
                                 </tr>
                             @endforeach
