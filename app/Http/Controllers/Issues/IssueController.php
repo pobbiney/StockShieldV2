@@ -260,8 +260,32 @@ class IssueController extends Controller
             ->get();
     }
 
+    private function itemTotalQtyMultiplier(ItemRequest $itemRequest): ?int
+    {
+        $multiplier = $itemRequest->itemname->total_qty ?? null;
+
+        if ($multiplier === null || $multiplier === '') {
+            return null;
+        }
+
+        $multiplier = (int) $multiplier;
+
+        return $multiplier > 0 ? $multiplier : null;
+    }
+
+    private function effectiveQtyFromStockQty(int $stockQty, ?int $totalQtyMultiplier): int
+    {
+        if ($totalQtyMultiplier === null) {
+            return $stockQty;
+        }
+
+        return $stockQty * $totalQtyMultiplier;
+    }
+
     private function buildAvailabilitySummary(ItemRequest $itemRequest): array
     {
+        $totalQtyMultiplier = $this->itemTotalQtyMultiplier($itemRequest);
+
         $allBatches = ApproveStock::where('item_id', $itemRequest->item_id)
             ->where('store_id', $itemRequest->item_store_id)
             ->where('status', 'approved')
@@ -273,17 +297,27 @@ class IssueController extends Controller
 
         $expiredBatches = $allBatches->filter(fn ($batch) => !$this->isBatchUsable($batch->expiry_date));
 
+        $rawAvailableQty = (int) $validBatches->sum('qty');
+        $availableEffectiveQty = $this->effectiveQtyFromStockQty($rawAvailableQty, $totalQtyMultiplier);
+
         return [
-            'available_qty'  => (int) $validBatches->sum('qty'),
-            'batch_count'    => $validBatches->count(),
-            'expired_only'   => $allBatches->isNotEmpty() && $validBatches->isEmpty(),
-            'has_expired'    => $expiredBatches->isNotEmpty(),
-            'nearest_expiry' => $validBatches->first()?->expiry_date,
-            'batches'        => $validBatches->map(fn ($b) => [
-                'batch_number' => $b->batch_number,
-                'qty'          => (int) $b->qty,
-                'expiry_date'  => $b->expiry_date ? Carbon::parse($b->expiry_date)->format('Y-m-d') : null,
-            ])->values()->all(),
+            'available_qty'           => $rawAvailableQty,
+            'available_effective_qty' => $availableEffectiveQty,
+            'total_qty_multiplier'    => $totalQtyMultiplier,
+            'batch_count'             => $validBatches->count(),
+            'expired_only'            => $allBatches->isNotEmpty() && $validBatches->isEmpty(),
+            'has_expired'             => $expiredBatches->isNotEmpty(),
+            'nearest_expiry'          => $validBatches->first()?->expiry_date,
+            'batches'                 => $validBatches->map(function ($b) use ($totalQtyMultiplier) {
+                $stockQty = (int) $b->qty;
+
+                return [
+                    'batch_number'  => $b->batch_number,
+                    'qty'           => $stockQty,
+                    'effective_qty' => $this->effectiveQtyFromStockQty($stockQty, $totalQtyMultiplier),
+                    'expiry_date'   => $b->expiry_date ? Carbon::parse($b->expiry_date)->format('Y-m-d') : null,
+                ];
+            })->values()->all(),
         ];
     }
 

@@ -85,20 +85,33 @@ class StockReceiptController extends Controller
 
         $groupedIssues = $listissues->groupBy('item_id')->map(function ($lines) {
             $first = $lines->first();
+            $multiplier = $this->receiptItemTotalQtyMultiplier($first->itemname);
 
-            $batchLines = $lines->map(fn ($issue) => (object) [
-                'issue_id'     => $issue->id,
-                'batch_number' => $issue->batch_number,
-                'qty'          => (int) $issue->qty,
-                'amount'       => (float) ($issue->amount ?? 0),
-            ])->values();
+            $batchLines = $lines->map(function ($issue) use ($multiplier) {
+                $issuedQty = (int) $issue->qty;
+
+                return (object) [
+                    'issue_id'       => $issue->id,
+                    'batch_number'   => $issue->batch_number,
+                    'qty'            => $issuedQty,
+                    'accept_qty'     => $this->receiptEffectiveQty($issuedQty, $multiplier),
+                    'amount'         => (float) ($issue->amount ?? 0),
+                    'issuing_store'  => $issue->issuefrom,
+                ];
+            })->values();
+
+            $issuedTotal = (int) $batchLines->sum('qty');
+            $acceptTotal = (int) $batchLines->sum('accept_qty');
 
             return (object) [
-                'item_id'      => $first->item_id,
-                'itemcode'     => $first->itemcode,
-                'itemname'     => $first->itemname,
-                'lines'        => $batchLines,
-                'total_qty'    => (int) $batchLines->sum('qty'),
+                'item_id'               => $first->item_id,
+                'itemcode'              => $first->itemcode,
+                'itemname'              => $first->itemname,
+                'lines'                 => $batchLines,
+                'issuing_store'         => $first->issuefrom,
+                'total_qty_multiplier'  => $multiplier,
+                'issued_qty'            => $issuedTotal,
+                'total_qty'             => $acceptTotal,
             ];
         })->values();
 
@@ -125,7 +138,8 @@ class StockReceiptController extends Controller
         $decodeID = Crypt::decrypt($requisition_no);
         $storeIds = [(int) $activeStore->id];
 
-        $issues = ItemIssue::whereIn('issue_to', $storeIds)
+        $issues = ItemIssue::with('itemname')
+            ->whereIn('issue_to', $storeIds)
             ->where('requisition_no', $decodeID)
             ->awaitingReceipt()
             ->get();
@@ -152,5 +166,31 @@ class StockReceiptController extends Controller
 
         return redirect()->route('ReceiveStock')
             ->with('message_success', $accepted . ' item line(s) accepted into ' . $activeStore->name . ' inventory.');
+    }
+
+    private function receiptItemTotalQtyMultiplier($item): ?int
+    {
+        if (!$item) {
+            return null;
+        }
+
+        $multiplier = $item->total_qty ?? null;
+
+        if ($multiplier === null || $multiplier === '') {
+            return null;
+        }
+
+        $multiplier = (int) $multiplier;
+
+        return $multiplier > 0 ? $multiplier : null;
+    }
+
+    private function receiptEffectiveQty(int $issuedQty, ?int $totalQtyMultiplier): int
+    {
+        if ($totalQtyMultiplier === null) {
+            return $issuedQty;
+        }
+
+        return $issuedQty * $totalQtyMultiplier;
     }
 }

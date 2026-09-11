@@ -181,7 +181,8 @@
                                 <th>UoM</th>
                                 <th>Qty Requested</th>
                                 <th>Qty Approved</th>
-                                <th>Available</th>
+                                <th>Available Qty</th>
+                                <th>Total Qty</th>
                                 <th>Qty to Issue</th>
                                 <th>Requested By</th>
                                 <th class="text-end">Action</th>
@@ -191,7 +192,14 @@
                             @foreach($listrequest as $lists)
                                 @php
                                     $approvedQty = $lists->qty ?? $lists->qty_requested;
-                                    $avail = $stockAvailability[$lists->id] ?? ['available_qty' => 0, 'expired_only' => false, 'batch_count' => 0, 'batches' => []];
+                                    $avail = $stockAvailability[$lists->id] ?? [
+                                        'available_qty' => 0,
+                                        'available_effective_qty' => 0,
+                                        'total_qty_multiplier' => null,
+                                        'expired_only' => false,
+                                        'batch_count' => 0,
+                                        'batches' => [],
+                                    ];
                                     $noStock = $avail['expired_only'] || $avail['available_qty'] <= 0;
                                     $maxIssue = $noStock ? 0 : min($approvedQty, $avail['available_qty']);
                                     $availClass = $avail['expired_only'] ? 'expired' : ($avail['available_qty'] <= 0 ? 'none' : ($avail['available_qty'] < $approvedQty ? 'low' : 'ok'));
@@ -225,6 +233,19 @@
                                                     @endif
                                                 </div>
                                             @endif
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($avail['expired_only'])
+                                            <span class="text-muted">—</span>
+                                        @elseif(!empty($avail['total_qty_multiplier']))
+                                            <span class="avail-badge ok">{{ number_format($avail['available_effective_qty']) }}</span>
+                                            <div class="batch-hint">
+                                                {{ number_format($avail['available_qty']) }} × {{ number_format($avail['total_qty_multiplier']) }}
+                                            </div>
+                                        @else
+                                            <span class="avail-badge {{ $availClass }}">{{ number_format($avail['available_qty']) }}</span>
+                                            <div class="batch-hint text-secondary">Same as stock qty</div>
                                         @endif
                                     </td>
                                     <td>

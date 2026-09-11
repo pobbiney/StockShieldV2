@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ApproveStock;
+use App\Models\Item;
 use App\Models\ItemIssue;
 use App\Models\ItemRequest;
 use App\Models\SatelliteStockReceipt;
@@ -58,6 +59,12 @@ class StockReceiptService
             return 0;
         }
 
+        $loadedById = ItemIssue::with('itemname')
+            ->whereIn('id', $issues->pluck('id'))
+            ->get()
+            ->keyBy('id');
+        $issues = $issues->map(fn (ItemIssue $issue) => $loadedById->get($issue->id, $issue));
+
         foreach ($issues as $issue) {
             if ((int) $issue->issue_to !== (int) $activeStore->id) {
                 throw new RuntimeException('One or more items are not addressed to your active store.');
@@ -93,11 +100,15 @@ class StockReceiptService
 
     protected function acceptSingleIssue(ItemIssue $issue, User $receiver): void
     {
-        $qty = (int) $issue->qty;
+        $issuedQty = (int) $issue->qty;
 
-        if ($qty <= 0) {
+        if ($issuedQty <= 0) {
             throw new RuntimeException('Cannot receive an issue line with zero quantity.');
         }
+
+        $issue->loadMissing('itemname');
+        $multiplier = $this->itemTotalQtyMultiplier($issue->itemname);
+        $qty = $this->effectiveReceiveQty($issuedQty, $multiplier);
 
         $metadata = $this->resolveBatchMetadata($issue);
         $satelliteStoreId = (int) $issue->issue_to;
@@ -128,6 +139,32 @@ class StockReceiptService
             'received_at' => now(),
             'received_by' => $receiver->id,
         ]);
+    }
+
+    protected function itemTotalQtyMultiplier(?Item $item): ?int
+    {
+        if (!$item) {
+            return null;
+        }
+
+        $multiplier = $item->total_qty ?? null;
+
+        if ($multiplier === null || $multiplier === '') {
+            return null;
+        }
+
+        $multiplier = (int) $multiplier;
+
+        return $multiplier > 0 ? $multiplier : null;
+    }
+
+    protected function effectiveReceiveQty(int $issuedQty, ?int $totalQtyMultiplier): int
+    {
+        if ($totalQtyMultiplier === null) {
+            return $issuedQty;
+        }
+
+        return $issuedQty * $totalQtyMultiplier;
     }
 
     /**

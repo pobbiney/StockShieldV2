@@ -78,6 +78,46 @@ class ItemRequest extends Model
         return $this->approvedQuantity() ?? (int) $this->qty_requested;
     }
 
+    public function itemTotalQtyMultiplier(): ?int
+    {
+        $item = $this->relationLoaded('itemname') ? $this->itemname : $this->itemname()->first();
+
+        if (!$item) {
+            return null;
+        }
+
+        $multiplier = $item->total_qty ?? null;
+
+        if ($multiplier === null || $multiplier === '') {
+            return null;
+        }
+
+        $multiplier = (int) $multiplier;
+
+        return $multiplier > 0 ? $multiplier : null;
+    }
+
+    public function effectiveQuantity(int $baseQty): int
+    {
+        $multiplier = $this->itemTotalQtyMultiplier();
+
+        if ($multiplier === null) {
+            return $baseQty;
+        }
+
+        return $baseQty * $multiplier;
+    }
+
+    public function effectiveRequestedQuantity(): int
+    {
+        return $this->effectiveQuantity((int) $this->qty_requested);
+    }
+
+    public function effectiveIssuedQuantity(): int
+    {
+        return $this->effectiveQuantity($this->issuedQuantity());
+    }
+
     public function issuedQuantity(): int
     {
         $statuses = ['issued', 'received'];

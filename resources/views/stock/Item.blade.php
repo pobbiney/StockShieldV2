@@ -860,7 +860,7 @@
 
                     <p class="modal-section-title">Classification & Store</p>
                     <div class="row g-3 mb-4">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label small fw-semibold">Category</label>
                             <select name="category_id" class="form-select">
                                 <option value="" disabled {{ old('category_id') ? '' : 'selected' }}>Choose category</option>
@@ -870,7 +870,7 @@
                             </select>
                             @error('category_id') <small class="text-danger">{{ $message }}</small> @enderror
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label small fw-semibold">Unit of Issue</label>
                             <select name="unit_of_measure_id" class="form-select">
                                 <option value="" disabled {{ old('unit_of_measure_id') ? '' : 'selected' }}>Choose unit</option>
@@ -880,7 +880,12 @@
                             </select>
                             @error('unit_of_measure_id') <small class="text-danger">{{ $message }}</small> @enderror
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold">Total Qty <span class="text-secondary fw-normal">(optional)</span></label>
+                            <input type="number" name="total_qty" class="form-control" value="{{ old('total_qty') }}" min="0" placeholder="e.g. 100">
+                            @error('total_qty') <small class="text-danger">{{ $message }}</small> @enderror
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label small fw-semibold">Store</label>
                             @if(!empty($isGlobalAccess))
                                 <select name="store_id" class="form-select">
@@ -961,7 +966,7 @@
 
                     <p class="modal-section-title">Classification & Store</p>
                     <div class="row g-3 mb-4">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label small fw-semibold">Category</label>
                             <select name="category_id" id="edit_category_id" class="form-select">
                                 @foreach($listcat as $cat)
@@ -970,7 +975,7 @@
                             </select>
                             @error('category_id') <small class="text-danger">{{ $message }}</small> @enderror
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label small fw-semibold">Unit of Issue</label>
                             <select name="unit_of_measure_id" id="edit_unit_id" class="form-select">
                                 @foreach($listunit as $unit)
@@ -979,7 +984,12 @@
                             </select>
                             @error('unit_of_measure_id') <small class="text-danger">{{ $message }}</small> @enderror
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label class="form-label small fw-semibold">Total Qty <span class="text-secondary fw-normal">(optional)</span></label>
+                            <input type="number" name="total_qty" id="edit_total_qty" class="form-control" min="0" placeholder="e.g. 100">
+                            @error('total_qty') <small class="text-danger">{{ $message }}</small> @enderror
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label small fw-semibold">Store</label>
                             @if(!empty($isGlobalAccess))
                                 <select name="store_id" id="edit_store_id" class="form-select">
@@ -1138,6 +1148,7 @@ function populateEditForm(data) {
     document.getElementById('edit_item_name').value = data.name || '';
     document.getElementById('edit_category_id').value = data.cat_id || '';
     document.getElementById('edit_unit_id').value = data.unit_id || '';
+    document.getElementById('edit_total_qty').value = data.total_qty ?? '';
     document.getElementById('edit_store_id').value = data.store_id || '';
     document.getElementById('edit_reorder_level').value = data.reorder_level ?? '';
     document.getElementById('edit_status').value = data.status || 'Active';
@@ -1202,6 +1213,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('edit_item_name').value = @json(old('name'));
     document.getElementById('edit_category_id').value = @json(old('category_id'));
     document.getElementById('edit_unit_id').value = @json(old('unit_of_measure_id'));
+    document.getElementById('edit_total_qty').value = @json(old('total_qty'));
     document.getElementById('edit_store_id').value = @json(old('store_id'));
     document.getElementById('edit_reorder_level').value = @json(old('re_order_level'));
     document.getElementById('edit_status').value = @json(old('status'));

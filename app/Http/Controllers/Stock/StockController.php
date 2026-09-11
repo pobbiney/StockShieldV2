@@ -373,7 +373,8 @@ class StockController extends Controller
             'category_id' => 'required',
             'status'=>'required',
             'store_id' => $this->storeContext->hasGlobalStoreAccess() ? 'required' : 'nullable',
-            're_order_level' => 'required'
+            're_order_level' => 'required',
+            'total_qty' => 'nullable|integer|min:0',
         ]);
 
         $storeId = $this->resolveStoreIdForItem($request);
@@ -395,6 +396,7 @@ class StockController extends Controller
         $item->name = trim($request->name);
         $item->cat_id = $request->category_id;
         $item->unit_id = $request->unit_of_measure_id;
+        $item->total_qty = $request->filled('total_qty') ? (int) $request->total_qty : null;
         $item->store_id = $storeId;
         $item->reorder_level = $request->re_order_level;
         $item->status = $request->status;
@@ -426,7 +428,8 @@ class StockController extends Controller
             'category_id' => 'required',
             'status'=>'required',
             'store_id' => $this->storeContext->hasGlobalStoreAccess() ? 'required' : 'nullable',
-            're_order_level' => 'required'
+            're_order_level' => 'required',
+            'total_qty' => 'nullable|integer|min:0',
         ]);
 
        
@@ -452,6 +455,7 @@ class StockController extends Controller
         $item->name = trim($request->name);
         $item->cat_id = $request->category_id;
         $item->unit_id = $request->unit_of_measure_id;
+        $item->total_qty = $request->filled('total_qty') ? (int) $request->total_qty : null;
         $item->store_id = $storeId;
         $item->status = $request->status;
         $item->reorder_level = $request->re_order_level;
