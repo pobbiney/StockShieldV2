@@ -24,13 +24,22 @@
                         </select>
                         @error('store_group')<div class="field-error">{{ $message }}</div>@enderror
                     </div>
-                    <div class="mb-0">
+                    <div class="mb-3">
                         <label class="form-label small fw-semibold" for="edit_store_status">Status</label>
                         <select class="form-select" name="status" id="edit_store_status" required>
                             <option value="Active">Active</option>
                             <option value="Inactive">Inactive</option>
                         </select>
                         @error('status')<div class="field-error">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="mb-0" id="edit_route_to_hub_wrap">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="route_requisitions_to_hub" value="1" id="edit_route_requisitions_to_hub">
+                            <label class="form-check-label small" for="edit_route_requisitions_to_hub">
+                                Route requisitions to hub store
+                            </label>
+                        </div>
+                        <p class="text-secondary small mb-0 mt-1">When enabled, this satellite store sends requisitions to the configured requisition hub instead of central stores.</p>
                     </div>
                 </div>
                 <div class="store-modal-footer d-flex justify-content-end gap-2">

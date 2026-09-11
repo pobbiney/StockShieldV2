@@ -9,6 +9,7 @@ class ItemIssue extends Model
 
 protected $fillable = [
     'stock_id',
+    'satellite_stock_receipt_id',
     'item_id',
     'batch_number',
     'qty',

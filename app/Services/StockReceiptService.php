@@ -6,6 +6,7 @@ use App\Models\ApproveStock;
 use App\Models\Item;
 use App\Models\ItemIssue;
 use App\Models\ItemRequest;
+use App\Models\SatelliteItemIssue;
 use App\Models\SatelliteStockReceipt;
 use App\Models\Stock;
 use App\Models\Store;
@@ -93,7 +94,60 @@ class StockReceiptService
         return $accepted;
     }
 
+    /**
+     * @param  Collection<int, SatelliteItemIssue>|array<int, SatelliteItemIssue>  $issues
+     */
+    public function acceptSatelliteIssues(Collection|array $issues, ?User $receiver = null): int
+    {
+        $receiver = $receiver ?? auth()->user();
+        $activeStore = $this->assertSatelliteReceiptContext($receiver);
+
+        $issues = collect($issues)->filter(fn (SatelliteItemIssue $issue) => $this->isSatelliteAwaitingReceipt($issue));
+
+        if ($issues->isEmpty()) {
+            return 0;
+        }
+
+        $loadedById = SatelliteItemIssue::with('itemname')
+            ->whereIn('id', $issues->pluck('id'))
+            ->get()
+            ->keyBy('id');
+        $issues = $issues->map(fn (SatelliteItemIssue $issue) => $loadedById->get($issue->id, $issue));
+
+        foreach ($issues as $issue) {
+            if ((int) $issue->issue_to !== (int) $activeStore->id) {
+                throw new RuntimeException('One or more items are not addressed to your active store.');
+            }
+        }
+
+        $accepted = 0;
+
+        DB::transaction(function () use ($issues, $receiver, &$accepted) {
+            foreach ($issues as $issue) {
+                if (!$this->isSatelliteAwaitingReceipt($issue)) {
+                    continue;
+                }
+
+                if (SatelliteStockReceipt::where('satellite_item_issue_id', $issue->id)->exists()) {
+                    continue;
+                }
+
+                $this->acceptSingleSatelliteIssue($issue, $receiver);
+                $accepted++;
+            }
+
+            $this->syncItemRequestsForSatelliteIssues($issues);
+        });
+
+        return $accepted;
+    }
+
     public function isAwaitingReceipt(ItemIssue $issue): bool
+    {
+        return $issue->status === 'issued' && $issue->status_two === 'issued';
+    }
+
+    public function isSatelliteAwaitingReceipt(SatelliteItemIssue $issue): bool
     {
         return $issue->status === 'issued' && $issue->status_two === 'issued';
     }
@@ -139,6 +193,73 @@ class StockReceiptService
             'received_at' => now(),
             'received_by' => $receiver->id,
         ]);
+    }
+
+    protected function acceptSingleSatelliteIssue(SatelliteItemIssue $issue, User $receiver): void
+    {
+        $issuedQty = (int) $issue->qty;
+
+        if ($issuedQty <= 0) {
+            throw new RuntimeException('Cannot receive an issue line with zero quantity.');
+        }
+
+        $issue->loadMissing('itemname');
+        $multiplier = $this->itemTotalQtyMultiplier($issue->itemname);
+        $qty = $this->effectiveReceiveQty($issuedQty, $multiplier);
+
+        $metadata = $this->resolveSatelliteIssueMetadata($issue);
+        $satelliteStoreId = (int) $issue->issue_to;
+
+        SatelliteStockReceipt::create([
+            'source_type'              => 'issue_transfer',
+            'satellite_item_issue_id'  => $issue->id,
+            'item_request_id'          => $issue->item_request_id,
+            'stock_id'                 => $issue->stock_id,
+            'item_id'                  => $issue->item_id,
+            'batch_number'             => $issue->batch_number,
+            'qty'                      => $qty,
+            'amount'                   => $issue->amount ?? $metadata['amount'],
+            'expiry_date'              => $metadata['expiry_date'],
+            'purchase_order'           => $metadata['purchase_order'],
+            'supplier_id'              => $metadata['supplier_id'],
+            'store_id'                 => $satelliteStoreId,
+            'central_store_id'         => $issue->store_id,
+            'requisition_no'           => $issue->requisition_no,
+            'invoice_number'           => $issue->invoice_number,
+            'received_by'              => $receiver->id,
+            'received_at'              => now(),
+        ]);
+
+        $issue->update([
+            'status'      => 'received',
+            'status_two'  => 'received',
+            'received_at' => now(),
+            'received_by' => $receiver->id,
+        ]);
+    }
+
+    /**
+     * @return array{expiry_date: ?string, amount: float, purchase_order: ?string, supplier_id: ?int}
+     */
+    protected function resolveSatelliteIssueMetadata(SatelliteItemIssue $issue): array
+    {
+        $sourceReceipt = SatelliteStockReceipt::find($issue->satellite_stock_receipt_id);
+
+        if ($sourceReceipt) {
+            return [
+                'expiry_date'    => $sourceReceipt->expiry_date,
+                'amount'         => (float) ($issue->amount ?? $sourceReceipt->amount ?? 0),
+                'purchase_order' => $sourceReceipt->purchase_order,
+                'supplier_id'    => $sourceReceipt->supplier_id,
+            ];
+        }
+
+        return [
+            'expiry_date'    => null,
+            'amount'         => (float) ($issue->amount ?? 0),
+            'purchase_order' => null,
+            'supplier_id'    => null,
+        ];
     }
 
     protected function itemTotalQtyMultiplier(?Item $item): ?int
@@ -244,15 +365,72 @@ class StockReceiptService
         }
     }
 
+    /**
+     * @param  Collection<int, SatelliteItemIssue>  $issues
+     */
+    protected function syncItemRequestsForSatelliteIssues(Collection $issues): void
+    {
+        $requestIds = $issues->pluck('item_request_id')->filter()->unique();
+
+        foreach ($requestIds as $requestId) {
+            $itemRequest = ItemRequest::find($requestId);
+
+            if (!$itemRequest) {
+                continue;
+            }
+
+            $pendingCentral = ItemIssue::where('item_request_id', $requestId)
+                ->where(function ($query) {
+                    $query->where('status', 'pending')
+                        ->orWhere(function ($q) {
+                            $q->where('status', 'issued')->where('status_two', 'issued');
+                        });
+                })
+                ->exists();
+
+            $pendingSatellite = SatelliteItemIssue::where('item_request_id', $requestId)
+                ->where(function ($query) {
+                    $query->where('status', 'pending')
+                        ->orWhere(function ($q) {
+                            $q->where('status', 'issued')->where('status_two', 'issued');
+                        });
+                })
+                ->exists();
+
+            if ($pendingCentral || $pendingSatellite) {
+                continue;
+            }
+
+            $receivedQty = (int) ItemIssue::where('item_request_id', $requestId)
+                ->where('status', 'received')
+                ->sum('qty');
+            $receivedQty += (int) SatelliteItemIssue::where('item_request_id', $requestId)
+                ->where('status', 'received')
+                ->sum('qty');
+
+            $itemRequest->update([
+                'qty_issued' => $receivedQty > 0 ? $receivedQty : $itemRequest->qty_issued,
+                'status'     => 'received',
+            ]);
+        }
+    }
+
     public function pendingReceiptCount(?int $satelliteStoreId = null): int
     {
         if (!$satelliteStoreId) {
             return 0;
         }
 
-        return ItemIssue::where('issue_to', $satelliteStoreId)
+        $central = ItemIssue::where('issue_to', $satelliteStoreId)
             ->where('status', 'issued')
             ->where('status_two', 'issued')
             ->count();
+
+        $satellite = SatelliteItemIssue::where('issue_to', $satelliteStoreId)
+            ->where('status', 'issued')
+            ->where('status_two', 'issued')
+            ->count();
+
+        return $central + $satellite;
     }
 }

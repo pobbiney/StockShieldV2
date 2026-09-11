@@ -106,6 +106,7 @@ Route::get('store',[SettingsController::class,'getStoreView'])->name('store');
 Route::post('add-store-process',[SettingsController::class,'addStore'])->name('add-store-process');
 Route::get('store-id/{id}',[SettingsController::class,'getstoreID'])->name('store-id');
 Route::post('edit-store-process',[SettingsController::class,'updateStore'])->name('edit-store-process');
+Route::post('set-requisition-hub',[SettingsController::class,'setRequisitionHub'])->name('set-requisition-hub');
 /* End Settings */
 
 /* Stock Management */

@@ -64,9 +64,12 @@ class DashboardController extends Controller implements HasMiddleware
         } elseif (!empty($centralStoreIds)) {
             $isCentralStore = true;
             $fulfillStoreIds = $centralStoreIds;
-        } elseif ($activeStore && ItemRequest::where('item_store_id', $activeStore->id)
-            ->whereIn('status', ['request approved', 'pending request'])
-            ->exists()) {
+        } elseif ($activeStore && (
+            $activeStore->isRequisitionHub()
+            || ItemRequest::where('item_store_id', $activeStore->id)
+                ->whereIn('status', ['request approved', 'pending request'])
+                ->exists()
+        )) {
             $isCentralStore = true;
             $fulfillStoreIds = [(int) $activeStore->id];
         }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Stock;
 
 use App\Http\Controllers\Controller;
 use App\Models\ItemIssue;
+use App\Models\SatelliteItemIssue;
 use App\Services\NotificationService;
 use App\Services\StockReceiptService;
 use App\Services\StoreContext;
@@ -29,11 +30,19 @@ class StockReceiptController extends Controller
 
         $storeIds = [(int) $activeStore->id];
 
-        $pendingIssues = ItemIssue::with(['issuefrom', 'staffname', 'authorised', 'itemname'])
+        $pendingCentral = ItemIssue::with(['issuefrom', 'staffname', 'authorised', 'itemname'])
             ->whereIn('issue_to', $storeIds)
             ->awaitingReceipt()
             ->orderByDesc('updated_at')
             ->get();
+
+        $pendingSatellite = SatelliteItemIssue::with(['issuefrom', 'staffname', 'authorised', 'itemname'])
+            ->whereIn('issue_to', $storeIds)
+            ->awaitingReceipt()
+            ->orderByDesc('updated_at')
+            ->get();
+
+        $pendingIssues = $pendingCentral->concat($pendingSatellite)->sortByDesc('updated_at')->values();
 
         $transfers = $pendingIssues->groupBy('requisition_no')->map(function ($lines) {
             $first = $lines->first();
@@ -70,13 +79,23 @@ class StockReceiptController extends Controller
         $decodeID = Crypt::decrypt($requisition_no);
         $storeIds = [(int) $activeStore->id];
 
-        $listissues = ItemIssue::with(['itemcode', 'itemname.unitname', 'issuefrom', 'staffname', 'authorised'])
+        $centralIssues = ItemIssue::with(['itemcode', 'itemname.unitname', 'issuefrom', 'staffname', 'authorised'])
             ->whereIn('issue_to', $storeIds)
             ->where('requisition_no', $decodeID)
             ->awaitingReceipt()
             ->orderBy('batch_number')
             ->orderBy('id')
             ->get();
+
+        $satelliteIssues = SatelliteItemIssue::with(['itemcode', 'itemname.unitname', 'issuefrom', 'staffname', 'authorised'])
+            ->whereIn('issue_to', $storeIds)
+            ->where('requisition_no', $decodeID)
+            ->awaitingReceipt()
+            ->orderBy('batch_number')
+            ->orderBy('id')
+            ->get();
+
+        $listissues = $centralIssues->concat($satelliteIssues);
 
         if ($listissues->isEmpty()) {
             return redirect()->route('ReceiveStock')
@@ -138,19 +157,26 @@ class StockReceiptController extends Controller
         $decodeID = Crypt::decrypt($requisition_no);
         $storeIds = [(int) $activeStore->id];
 
-        $issues = ItemIssue::with('itemname')
+        $centralIssues = ItemIssue::with('itemname')
             ->whereIn('issue_to', $storeIds)
             ->where('requisition_no', $decodeID)
             ->awaitingReceipt()
             ->get();
 
-        if ($issues->isEmpty()) {
+        $satelliteIssues = SatelliteItemIssue::with('itemname')
+            ->whereIn('issue_to', $storeIds)
+            ->where('requisition_no', $decodeID)
+            ->awaitingReceipt()
+            ->get();
+
+        if ($centralIssues->isEmpty() && $satelliteIssues->isEmpty()) {
             return redirect()->route('ReceiveStock')
                 ->with('message_error', 'No pending items to receive for this transfer.');
         }
 
         try {
-            $accepted = $this->stockReceipt->acceptIssues($issues);
+            $accepted = $this->stockReceipt->acceptIssues($centralIssues);
+            $accepted += $this->stockReceipt->acceptSatelliteIssues($satelliteIssues);
         } catch (RuntimeException $e) {
             return back()->with('message_error', $e->getMessage());
         }

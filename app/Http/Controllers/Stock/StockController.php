@@ -21,6 +21,7 @@ use Illuminate\Support\Str;
 use App\Imports\ItemsImport;
 use App\Models\ItemRequest;
 use App\Models\SatelliteStockEntry;
+use App\Models\SatelliteItemIssue;
 use App\Models\SatelliteStockReceipt;
 use App\Models\ReturnItem;
 use App\Services\StoreContext;
@@ -1424,11 +1425,19 @@ class StockController extends Controller
             return redirect()->route('choose-store');
         }
 
-        $pendingIssues = ItemIssue::with(['staffname', 'storename', 'itemname'])
+        $pendingCentral = ItemIssue::with(['staffname', 'storename', 'itemname'])
             ->whereIn('store_id', $storeIds)
             ->submittedForHodApproval()
             ->orderByDesc('created_at')
             ->get();
+
+        $pendingSatellite = SatelliteItemIssue::with(['staffname', 'storename', 'itemname'])
+            ->whereIn('store_id', $storeIds)
+            ->submittedForHodApproval()
+            ->orderByDesc('created_at')
+            ->get();
+
+        $pendingIssues = $pendingCentral->concat($pendingSatellite)->sortByDesc('created_at')->values();
 
         $requisitions = $pendingIssues->groupBy('requisition_no')->map(function ($lines) {
             $first = $lines->first();
@@ -1510,39 +1519,62 @@ class StockController extends Controller
         
 
         foreach ($request->issue_id as $issueId) {
+            $issueKey = (string) $issueId;
+            $isSatelliteIssue = str_starts_with($issueKey, 's');
 
-            $issue = ItemIssue::where('id', $issueId)
-                ->submittedForHodApproval()
-                ->first();
+            if ($isSatelliteIssue) {
+                $issue = SatelliteItemIssue::where('id', (int) substr($issueKey, 1))
+                    ->submittedForHodApproval()
+                    ->first();
+            } else {
+                $issue = ItemIssue::where('id', $issueKey)
+                    ->submittedForHodApproval()
+                    ->first();
+            }
 
-            if (!$issue) continue;
+            if (!$issue) {
+                continue;
+            }
 
             $processedRequisitions[$issue->requisition_no] = true;
 
-            $approvedQty = (int) ($request->qty[$issueId] ?? 0);
+            $approvedQty = (int) ($request->qty[$issueKey] ?? 0);
 
             if ($approvedQty <= 0) {
                 continue;
             }
 
-            $stock = ApproveStock::where('item_id', $issue->item_id)
-                ->where('batch_number', $issue->batch_number)
-                ->where('store_id', $issue->store_id)
-                ->first();
+            if ($issue instanceof SatelliteItemIssue) {
+                $receipt = SatelliteStockReceipt::find($issue->satellite_stock_receipt_id);
 
-            if (!$stock) {
-                return back()->with('message_error', 'Stock not found for '.$issue->itemname->name);
+                if (!$receipt) {
+                    return back()->with('message_error', 'Satellite stock not found for '.$issue->itemname->name);
+                }
+
+                if ($approvedQty > (int) $receipt->qty) {
+                    return back()->with('message_error', 'Insufficient stock for '.$issue->itemname->name);
+                }
+
+                $receipt->qty = (int) $receipt->qty - $approvedQty;
+                $receipt->save();
+            } else {
+                $stock = ApproveStock::where('item_id', $issue->item_id)
+                    ->where('batch_number', $issue->batch_number)
+                    ->where('store_id', $issue->store_id)
+                    ->first();
+
+                if (!$stock) {
+                    return back()->with('message_error', 'Stock not found for '.$issue->itemname->name);
+                }
+
+                if ($approvedQty > $stock->qty) {
+                    return back()->with('message_error', 'Insufficient stock for '.$issue->itemname->name);
+                }
+
+                $stock->qty -= $approvedQty;
+                $stock->save();
             }
 
-            if ($approvedQty > $stock->qty) {
-                return back()->with('message_error', 'Insufficient stock for '.$issue->itemname->name);
-            }
-
-            // Deduct stock
-            $stock->qty -= $approvedQty;
-            $stock->save();
-
-        
             $issue->qty = $approvedQty;
             $issue->invoice_number = $invoiceNo;
             $issue->issued_by = Auth::id();
@@ -1552,6 +1584,9 @@ class StockController extends Controller
 
             if ($issue->item_request_id) {
                 $totalIssued = (int) ItemIssue::where('item_request_id', $issue->item_request_id)
+                    ->where('status', 'issued')
+                    ->sum('qty');
+                $totalIssued += (int) SatelliteItemIssue::where('item_request_id', $issue->item_request_id)
                     ->where('status', 'issued')
                     ->sum('qty');
 
@@ -1714,10 +1749,16 @@ class StockController extends Controller
 
      public function getIssueItemID($id)
     {
-        $data = ItemIssue::with('itemname')->findOrFail($id);
+        $issueKey = (string) $id;
+
+        if (str_starts_with($issueKey, 's')) {
+            $data = SatelliteItemIssue::with('itemname')->findOrFail((int) substr($issueKey, 1));
+        } else {
+            $data = ItemIssue::with('itemname')->findOrFail($issueKey);
+        }
 
         return response()->json([
-            'id'   => $data->id,
+            'id'   => $issueKey,
             'name' => $data->itemname->name ?? 'Item',
         ]);
     }

@@ -6,7 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\ApproveStock;
 use App\Models\ItemIssue;
 use App\Models\ItemRequest;
+use App\Models\SatelliteItemIssue;
+use App\Models\SatelliteStockReceipt;
 use App\Services\NotificationService;
+use App\Services\RequisitionFulfillmentService;
+use App\Services\SatelliteIssueService;
 use App\Services\StoreContext;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -19,7 +23,9 @@ class IssueController extends Controller
 {
     public function __construct(
         protected StoreContext $storeContext,
-        protected NotificationService $notifications
+        protected NotificationService $notifications,
+        protected RequisitionFulfillmentService $requisitionFulfillment,
+        protected SatelliteIssueService $satelliteIssue
     ) {}
 
     public function getviewStoreRequest($requisition_no)
@@ -125,8 +131,24 @@ class IssueController extends Controller
                 continue;
             }
 
-            $batches = $this->getAvailableBatches($itemRequest);
-            $allocations = $this->allocateFromBatches($batches, $qtyToIssue);
+            $useSatelliteInventory = $this->requisitionFulfillment->usesSatelliteInventoryByStoreId(
+                (int) $itemRequest->item_store_id
+            );
+
+            if ($useSatelliteInventory) {
+                $receipts = $this->satelliteIssue->getAvailableReceipts(
+                    (int) $itemRequest->item_id,
+                    (int) $itemRequest->item_store_id
+                );
+                $receiptAllocations = $this->satelliteIssue->allocateFromReceipts($receipts, $qtyToIssue);
+                $allocations = array_map(fn ($row) => [
+                    'receipt' => $row['receipt'],
+                    'qty'     => $row['qty'],
+                ], $receiptAllocations);
+            } else {
+                $batches = $this->getAvailableBatches($itemRequest);
+                $allocations = $this->allocateFromBatches($batches, $qtyToIssue);
+            }
 
             if ($this->allocatedTotal($allocations) < $qtyToIssue) {
                 $errors[] = "{$itemName}: unable to allocate the full quantity from available batches.";
@@ -134,19 +156,32 @@ class IssueController extends Controller
             }
 
             foreach ($allocations as $allocation) {
+                $expiryDate = isset($allocation['receipt'])
+                    ? $allocation['receipt']->expiry_date
+                    : $allocation['stock']->expiry_date;
+
+                if (!$expiryDate) {
+                    continue;
+                }
+
+                $batchNumber = isset($allocation['receipt'])
+                    ? $allocation['receipt']->batch_number
+                    : $allocation['stock']->batch_number;
+
                 $daysToExpiry = now()->startOfDay()->diffInDays(
-                    Carbon::parse($allocation['stock']->expiry_date)->startOfDay(),
+                    Carbon::parse($expiryDate)->startOfDay(),
                     false
                 );
                 if ($daysToExpiry <= 30) {
-                    $expiryWarnings[] = "{$itemName} (batch {$allocation['stock']->batch_number}): expires in {$daysToExpiry} day(s).";
+                    $expiryWarnings[] = "{$itemName} (batch {$batchNumber}): expires in {$daysToExpiry} day(s).";
                 }
             }
 
             $issuePlan[] = [
-                'item_request' => $itemRequest,
-                'qty_to_issue' => $qtyToIssue,
-                'allocations'  => $allocations,
+                'item_request'            => $itemRequest,
+                'qty_to_issue'            => $qtyToIssue,
+                'allocations'             => $allocations,
+                'use_satellite_inventory' => $useSatelliteInventory,
             ];
         }
 
@@ -167,10 +202,36 @@ class IssueController extends Controller
                 foreach ($issuePlan as $plan) {
                     /** @var ItemRequest $itemRequest */
                     $itemRequest = $plan['item_request'];
+                    $useSatelliteInventory = (bool) ($plan['use_satellite_inventory'] ?? false);
 
                     foreach ($plan['allocations'] as $allocation) {
-                        $stock = $allocation['stock'];
                         $qtyToTake = $allocation['qty'];
+
+                        if ($useSatelliteInventory && isset($allocation['receipt'])) {
+                            /** @var SatelliteStockReceipt $receipt */
+                            $receipt = $allocation['receipt'];
+
+                            SatelliteItemIssue::create([
+                                'satellite_stock_receipt_id' => $receipt->id,
+                                'stock_id'                   => $receipt->stock_id,
+                                'item_id'                    => $receipt->item_id,
+                                'batch_number'               => $receipt->batch_number,
+                                'qty_requested'              => $itemRequest->qty ?? $itemRequest->qty_requested,
+                                'qty'                        => $qtyToTake,
+                                'amount'                     => $receipt->amount,
+                                'requisition_no'             => $itemRequest->requisition_no,
+                                'item_request_id'            => $itemRequest->id,
+                                'issue_to'                   => $itemRequest->store_id,
+                                'store_id'                   => $itemRequest->item_store_id,
+                                'created_by'                 => Auth::id(),
+                                'status'                     => 'pending',
+                                'status_two'                 => 'pending',
+                            ]);
+
+                            continue;
+                        }
+
+                        $stock = $allocation['stock'];
 
                         ItemIssue::create([
                             'stock_id'        => $stock->stock_id,
@@ -286,6 +347,40 @@ class IssueController extends Controller
     {
         $totalQtyMultiplier = $this->itemTotalQtyMultiplier($itemRequest);
 
+        if ($this->requisitionFulfillment->usesSatelliteInventoryByStoreId((int) $itemRequest->item_store_id)) {
+            $allReceipts = SatelliteStockReceipt::where('item_id', $itemRequest->item_id)
+                ->where('store_id', $itemRequest->item_store_id)
+                ->where('qty', '>', 0)
+                ->orderBy('expiry_date', 'ASC')
+                ->get();
+
+            $validReceipts = $allReceipts->filter(fn ($receipt) => $this->isReceiptUsable($receipt));
+            $expiredReceipts = $allReceipts->filter(fn ($receipt) => !$this->isReceiptUsable($receipt));
+
+            $rawAvailableQty = (int) $validReceipts->sum('qty');
+            $availableEffectiveQty = $this->effectiveQtyFromStockQty($rawAvailableQty, $totalQtyMultiplier);
+
+            return [
+                'available_qty'           => $rawAvailableQty,
+                'available_effective_qty' => $availableEffectiveQty,
+                'total_qty_multiplier'    => $totalQtyMultiplier,
+                'batch_count'             => $validReceipts->count(),
+                'expired_only'            => $allReceipts->isNotEmpty() && $validReceipts->isEmpty(),
+                'has_expired'             => $expiredReceipts->isNotEmpty(),
+                'nearest_expiry'          => $validReceipts->first()?->expiry_date,
+                'batches'                 => $validReceipts->map(function ($receipt) use ($totalQtyMultiplier) {
+                    $stockQty = (int) $receipt->qty;
+
+                    return [
+                        'batch_number'  => $receipt->batch_number,
+                        'qty'           => $stockQty,
+                        'effective_qty' => $this->effectiveQtyFromStockQty($stockQty, $totalQtyMultiplier),
+                        'expiry_date'   => $receipt->expiry_date ? Carbon::parse($receipt->expiry_date)->format('Y-m-d') : null,
+                    ];
+                })->values()->all(),
+            ];
+        }
+
         $allBatches = ApproveStock::where('item_id', $itemRequest->item_id)
             ->where('store_id', $itemRequest->item_store_id)
             ->where('status', 'approved')
@@ -319,6 +414,15 @@ class IssueController extends Controller
                 ];
             })->values()->all(),
         ];
+    }
+
+    private function isReceiptUsable(SatelliteStockReceipt $receipt): bool
+    {
+        if (!$receipt->expiry_date) {
+            return true;
+        }
+
+        return Carbon::parse($receipt->expiry_date)->startOfDay()->gte(now()->startOfDay());
     }
 
     private function isBatchUsable($expiryDate): bool
