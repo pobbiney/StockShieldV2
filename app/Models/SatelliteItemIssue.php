@@ -10,6 +10,7 @@ class SatelliteItemIssue extends Model
         'satellite_stock_receipt_id',
         'stock_id',
         'item_id',
+        'unit_id',
         'batch_number',
         'qty',
         'qty_requested',
@@ -69,6 +70,11 @@ class SatelliteItemIssue extends Model
     public function itemname()
     {
         return $this->belongsTo(Item::class, 'item_id', 'id');
+    }
+
+    public function unitname()
+    {
+        return $this->belongsTo(UnitOfMeasure::class, 'unit_id', 'id');
     }
 
     public function storename()

@@ -723,6 +723,7 @@ class RequisitionController extends Controller
             $satelliteIssueLines = SatelliteItemIssue::with([
                 'itemcode',
                 'itemname.unitname',
+                'unitname',
                 'issuefrom',
                 'storename',
                 'staffname',
@@ -806,6 +807,7 @@ class RequisitionController extends Controller
         $satelliteLines = SatelliteItemIssue::with([
             'itemcode',
             'itemname.unitname',
+            'unitname',
             'issuefrom',
             'storename',
             'staffname',
@@ -875,6 +877,7 @@ class RequisitionController extends Controller
         }
 
         $issueRelations = ['staffname', 'authorised', 'itemcode', 'itemname.unitname', 'itemRequest.staffname'];
+        $satelliteIssueRelations = array_merge($issueRelations, ['unitname']);
 
         $issues = $this->scopePickListStores(
             ItemIssue::with($issueRelations)->where('invoice_number', $decodeID),
@@ -890,7 +893,7 @@ class RequisitionController extends Controller
             )->get();
         } else {
             $issues = $this->scopePickListStores(
-                SatelliteItemIssue::with($issueRelations)->where('invoice_number', $decodeID),
+                SatelliteItemIssue::with($satelliteIssueRelations)->where('invoice_number', $decodeID),
                 $storeIds
             )->first();
 
@@ -899,7 +902,7 @@ class RequisitionController extends Controller
             }
 
             $listissues = $this->scopePickListStores(
-                SatelliteItemIssue::with($issueRelations)->where('invoice_number', $decodeID),
+                SatelliteItemIssue::with($satelliteIssueRelations)->where('invoice_number', $decodeID),
                 $storeIds
             )->get();
         }
@@ -1095,7 +1098,7 @@ class RequisitionController extends Controller
             ->orderBy('id')
             ->get();
 
-        $satelliteIssues = SatelliteItemIssue::with(['staffname', 'storename', 'itemcode', 'itemname.unitname', 'issuefrom', 'satelliteStockReceipt'])
+        $satelliteIssues = SatelliteItemIssue::with(['staffname', 'storename', 'itemcode', 'itemname.unitname', 'unitname', 'issuefrom', 'satelliteStockReceipt'])
             ->whereIn('store_id', $listdept)
             ->where('requisition_no', $decodeID)
             ->submittedForHodApproval()

@@ -435,7 +435,7 @@
             <td>{{ $loop->iteration }}</td>
             <td>{{ optional($line->itemcode)->item_code ?? '—' }}</td>
             <td>{{ optional($line->itemname)->name ?? '—' }}</td>
-            <td>{{ optional(optional($line->itemname)->unitname)->name ?? '—' }}</td>
+            <td>{{ optional($line->unitname)->name ?? optional(optional($line->itemname)->unitname)->name ?? '—' }}</td>
             <td>{{ $line->batch_number ?? '—' }}</td>
             <td>{{ $line->qty_issued }}</td>
           </tr>

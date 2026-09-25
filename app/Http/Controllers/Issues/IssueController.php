@@ -8,6 +8,7 @@ use App\Models\ItemIssue;
 use App\Models\ItemRequest;
 use App\Models\SatelliteItemIssue;
 use App\Models\SatelliteStockReceipt;
+use App\Models\UnitOfMeasure;
 use App\Services\NotificationService;
 use App\Services\RequisitionFulfillmentService;
 use App\Services\SatelliteIssueService;
@@ -45,14 +46,22 @@ class IssueController extends Controller
         }
 
         $stockAvailability = [];
+        $usesSatelliteByLine = [];
         foreach ($listrequest as $line) {
             $stockAvailability[$line->id] = $this->buildAvailabilitySummary($line);
+            $usesSatelliteByLine[$line->id] = $this->requisitionFulfillment->usesSatelliteInventoryByStoreId(
+                (int) $line->item_store_id
+            );
         }
 
+        $listunit = UnitOfMeasure::where('status', 'Active')->orderBy('name')->get();
+
         return view('stock.viewStoreRequest', [
-            'listrequest'       => $listrequest,
-            'requisitionNo'     => $decodeID,
-            'stockAvailability' => $stockAvailability,
+            'listrequest'         => $listrequest,
+            'requisitionNo'       => $decodeID,
+            'stockAvailability'   => $stockAvailability,
+            'usesSatelliteByLine' => $usesSatelliteByLine,
+            'listunit'            => $listunit,
         ]);
     }
 
@@ -60,6 +69,7 @@ class IssueController extends Controller
     {
         $requestIds = $request->input('request_id', []);
         $qtyInputs  = $request->input('qty', []);
+        $unitInputs = $request->input('unit_id', []);
 
         if (empty($requestIds)) {
             return back()->with('message_error', 'No items selected to issue.');
@@ -182,11 +192,16 @@ class IssueController extends Controller
                 }
             }
 
+            $selectedUnitId = isset($unitInputs[$itemRequestId]) ? (int) $unitInputs[$itemRequestId] : 0;
+            $defaultUnitId = (int) ($itemRequest->itemname->unit_id ?? 0);
+            $issueUnitId = $selectedUnitId > 0 ? $selectedUnitId : $defaultUnitId;
+
             $issuePlan[] = [
                 'item_request'            => $itemRequest,
                 'qty_to_issue'            => $qtyToIssue,
                 'allocations'             => $allocations,
                 'use_satellite_inventory' => $useSatelliteInventory,
+                'unit_id'                 => $issueUnitId > 0 ? $issueUnitId : null,
             ];
         }
 
@@ -220,6 +235,7 @@ class IssueController extends Controller
                                 'satellite_stock_receipt_id' => $receipt->id,
                                 'stock_id'                   => $receipt->stock_id,
                                 'item_id'                    => $receipt->item_id,
+                                'unit_id'                    => $plan['unit_id'] ?? $itemRequest->itemname->unit_id ?? null,
                                 'batch_number'               => $receipt->batch_number,
                                 'qty_requested'              => $itemRequest->qty ?? $itemRequest->qty_requested,
                                 'qty'                        => $qtyToTake,

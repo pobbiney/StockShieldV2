@@ -84,6 +84,25 @@
 
     .qty-input.is-invalid { border-color: #dc2626; }
 
+    .uom-select {
+        min-width: 140px;
+        height: 38px;
+        border-radius: 0.5rem;
+        border: 1.5px solid #c7d2fe;
+        background: #eef2ff;
+        color: #1e1b4b;
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 0.25rem 1.75rem 0.25rem 0.65rem;
+    }
+
+    .uom-select:focus {
+        outline: none;
+        border-color: #4f46e5;
+        background: #fff;
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+    }
+
     .avail-badge {
         display: inline-block;
         padding: 0.15rem 0.5rem;
@@ -216,7 +235,24 @@
                                     </td>
                                     <td><code>{{ $lists->itemcode->item_code ?? '—' }}</code></td>
                                     <td class="fw-semibold">{{ $lists->itemname->name ?? '—' }}</td>
-                                    <td>{{ $lists->itemname->unitname->name ?? '—' }}</td>
+                                    <td>
+                                        @php
+                                            $usesSatellite = !empty($usesSatelliteByLine[$lists->id]);
+                                            $itemUnitId = old('unit_id.'.$lists->id, optional($lists->itemname)->unit_id);
+                                        @endphp
+                                        @if($usesSatellite)
+                                            <select name="unit_id[{{ $lists->id }}]" class="form-select uom-select" aria-label="Unit of measure">
+                                                <option value="" disabled {{ $itemUnitId ? '' : 'selected' }}>Choose unit</option>
+                                                @foreach($listunit as $unit)
+                                                    <option value="{{ $unit->id }}" {{ (string) $itemUnitId === (string) $unit->id ? 'selected' : '' }}>
+                                                        {{ $unit->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        @else
+                                            {{ optional($lists->itemname->unitname)->name ?? '—' }}
+                                        @endif
+                                    </td>
                                     <td><strong>{{ $lists->qty_requested }}</strong></td>
                                     <td><strong class="text-success">{{ $approvedQty }}</strong></td>
                                     <td>

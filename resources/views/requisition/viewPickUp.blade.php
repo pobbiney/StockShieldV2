@@ -367,7 +367,7 @@
                                 <td class="text-secondary">{{ $loop->iteration }}</td>
                                 <td><code>{{ optional($lists->itemcode)->item_code ?? '—' }}</code></td>
                                 <td class="fw-semibold">{{ optional($lists->itemname)->name ?? '—' }}</td>
-                                <td>{{ optional(optional($lists->itemname)->unitname)->name ?? '—' }}</td>
+                                <td>{{ optional($lists->unitname)->name ?? optional(optional($lists->itemname)->unitname)->name ?? '—' }}</td>
                                 <td><span class="batch-code">{{ $lists->batch_number ?: '—' }}</span></td>
                                 <td><span class="qty-badge">{{ number_format((int) $lists->qty) }}</span></td>
                                 <td>

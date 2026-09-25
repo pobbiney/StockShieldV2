@@ -571,7 +571,7 @@ tfoot td {
         <td>{{ $loop->iteration}}</td>
         <td> {{ $list->itemcode->item_code }}</td>
         <td>{{ $list->itemname->name }}</td>
-         <td>{{$list->itemname->unitname->name }}</td>
+         <td>{{ optional($list->unitname)->name ?? optional(optional($list->itemname)->unitname)->name ?? '—' }}</td>
         <td>{{ $list->qty }}</td>
       </tr>
       
