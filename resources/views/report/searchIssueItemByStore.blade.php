@@ -60,9 +60,9 @@ $backUrl = route('IssuedItemsReport');
                 <td>{{ $lists->invoice_number }}</td>
                 <td>{{ $lists->staffname->name }}</td>
                 <td>{{ Carbon\Carbon::parse($lists->created_at)->format('F jS, Y \a\t h:i A') }}</td>
-                <td><b>{{ $lists->qty }}</b></td>
-                <td><b>{{ $lists->amount }}</b></td>
-                <td><b>{{ number_format($lineTotal, 2) }}</b></td>
+                <td><b>{{ rp_qty($lists->qty) }}</b></td>
+                <td><b>{{ rp_amt($lists->amount) }}</b></td>
+                <td><b>{{ rp_amt($lineTotal) }}</b></td>
             </tr>
             @endforeach
         </tbody>
@@ -77,9 +77,9 @@ $backUrl = route('IssuedItemsReport');
                 <th></th>
                 <th></th>
                 <th class="text-end">TOTAL</th>
-                <th>{{ $totalqty }}</th>
+                <th>{{ rp_qty($totalqty) }}</th>
                 <th></th>
-                <th>{{ number_format($grandTotal, 2) }}</th>
+                <th>{{ rp_amt($grandTotal) }}</th>
             </tr>
         </tfoot>
     </table>

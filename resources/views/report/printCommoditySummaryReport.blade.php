@@ -545,24 +545,22 @@ tfoot td {
                                 {{ $store['store_name'] }} 
                                
                   </td>
-                  <td  >{{ $store['balance_bf_value'] }}</td>
-                  <td  >{{ $store['receipts_value'] }}</td>
-                  <td  >{{ $store['total_stock_value'] }}</td>
-                  <td  >{{ $store['issued_value'] }}</td>
-                  <td  >
-                      {{ $store['closing_balance_value'] }}
-                  </td>
+                  <td>{{ rp_amt($store['balance_bf_value']) }}</td>
+                  <td>{{ rp_amt($store['receipts_value']) }}</td>
+                  <td>{{ rp_amt($store['total_stock_value']) }}</td>
+                  <td>{{ rp_amt($store['issued_value']) }}</td>
+                  <td>{{ rp_amt($store['closing_balance_value']) }}</td>
             </tr>
 
             @endforeach
 
             <tr class="fw-bold bg-light">
                 <td colspan="2" class="text-end">GRAND TOTAL:</th>
-                            <td> <b> {{number_format($totalBF,2)}}</b></td>
-                            <td> <b> {{number_format($totalREc,2)}}</b></td>
-                            <td> <b> {{number_format($totalStockval,2)}}</b></td>
-                            <td> <b> {{number_format($totalIssVal,2)}}</b></td>
-                            <td> <b> {{number_format($totalClVal,2)}}</b></td>
+                            <td><b>{{ rp_amt($totalBF) }}</b></td>
+                            <td><b>{{ rp_amt($totalREc) }}</b></td>
+                            <td><b>{{ rp_amt($totalStockval) }}</b></td>
+                            <td><b>{{ rp_amt($totalIssVal) }}</b></td>
+                            <td><b>{{ rp_amt($totalClVal) }}</b></td>
             </tr>
                 
         </tbody>

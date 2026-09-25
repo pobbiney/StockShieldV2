@@ -16,47 +16,63 @@ class ReportController extends Controller
 {
     public function getItemReportView()
     {
+        $listdept = array_map('intval', explode('~', Auth::user()->department_id));
+        $liststores = Store::whereIn('id', $listdept)->get();
 
-         $liststores = Store::all();
-        return view('report.ItemReport',['liststores'=>$liststores]);
+        return view('report.ItemReport', ['liststores' => $liststores]);
     }
 
-      public function searchStockReport(Request $request)
-        {
+    protected function stockItemsForStore(int $storeId)
+    {
+        return Item::with(['approveStock', 'unitname', 'categoryname', 'storename'])
+            ->where('status', 'Active')
+            ->where('store_id', $storeId)
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function searchStockReport(Request $request)
+    {
         $request->validate([
             'department' => 'required',
         ]);
 
-       
-        // All stores
-        $liststores = Store::all();
-
-        // Search Item
-     $liststock = Item::with(['approveStock'])
-    ->where('status', 'Active')
-    ->where('store_id', $request->department)
-    ->get();
+        $listdept = array_map('intval', explode('~', Auth::user()->department_id));
+        $liststores = Store::whereIn('id', $listdept)->get();
+        $liststock = $this->stockItemsForStore((int) $request->department);
+        $selectedStore = Store::find($request->department);
 
         if ($liststock->count() > 0) {
-
             return view(
                 'report.ItemReport',
-                compact('liststock', 'liststores'  )
+                compact('liststock', 'liststores', 'selectedStore')
             )->with(
                 'message_success',
                 $liststock->count().' Items(s) found'
             );
-
-        } else {
-
-            return view(
-                'report.ItemReport',
-                compact('liststock', 'liststores')
-            )->with(
-                'message_error',
-                'No Items found'
-            );
         }
+
+        return view(
+            'report.ItemReport',
+            compact('liststock', 'liststores', 'selectedStore')
+        )->with(
+            'message_error',
+            'No Items found'
+        );
+    }
+
+    public function printItemReport(Request $request)
+    {
+        $liststock = $this->stockItemsForStore((int) $request->department);
+        $exclude = array_values(array_filter(array_map('intval', (array) $request->input('exclude', []))));
+
+        if ($exclude) {
+            $liststock = $liststock->whereNotIn('id', $exclude)->values();
+        }
+
+        $store = Store::find($request->department);
+
+        return view('report.printSummaryReport', compact('liststock', 'store'));
     }
 
      public function getReceivedStocksView()

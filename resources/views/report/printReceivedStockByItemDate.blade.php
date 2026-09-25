@@ -598,10 +598,10 @@ tfoot td {
                 <td>{{ $lists->expiry_date }}</td>
                 <td>{{ $lists->award_letter }}</td>  
                 {{-- <td>{{ $lists->staffname->name }}</td> --}}
-                <td>{{ $lists->amount ?? ''}}</td>
-                <td>{{ $lists->qty ?? ''}} </td>
+                <td>{{ rp_amt($lists->amount) }}</td>
+                <td>{{ rp_qty($lists->qty) }}</td>
                 
-                <td>{{ number_format($lineTotal,2)}}</td>
+                <td>{{ rp_amt($lineTotal) }}</td>
             </tr>
             @endforeach
              
@@ -611,7 +611,7 @@ tfoot td {
         <tr>
           <td colspan="10"><span class="total-label">Grand Total</span></td>
           <td></td>
-          <td><strong>{{ $totalqty }}</strong></td>
+          <td><strong>{{ rp_qty($totalqty) }}</strong></td>
           <td><strong>GH₵ {{ number_format($grandTotal,2) }}</strong></td>
         </tr>
       </tfoot>

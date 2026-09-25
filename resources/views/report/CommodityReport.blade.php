@@ -49,11 +49,11 @@ $breadcrumbLabel = 'Commodity Report';
             <tr>
                 <td>{{ $loop->iteration }}</td>
                 <td>{{ $store['store_name'] }}</td>
-                <td class="text-end">{{ $store['balance_bf_value'] }}</td>
-                <td class="text-end">{{ $store['receipts_value'] }}</td>
-                <td class="text-end">{{ $store['total_stock_value'] }}</td>
-                <td class="text-end">{{ $store['issued_value'] }}</td>
-                <td class="text-end">{{ $store['closing_balance_value'] }}</td>
+                <td class="text-end">{{ rp_amt($store['balance_bf_value']) }}</td>
+                <td class="text-end">{{ rp_amt($store['receipts_value']) }}</td>
+                <td class="text-end">{{ rp_amt($store['total_stock_value']) }}</td>
+                <td class="text-end">{{ rp_amt($store['issued_value']) }}</td>
+                <td class="text-end">{{ rp_amt($store['closing_balance_value']) }}</td>
             </tr>
             @empty
             <tr>
@@ -64,11 +64,11 @@ $breadcrumbLabel = 'Commodity Report';
         <tfoot>
             <tr>
                 <th colspan="2" class="text-end">GRAND TOTAL:</th>
-                <th class="text-end"><b>{{ number_format($totalBF, 2) }}</b></th>
-                <th class="text-end"><b>{{ number_format($totalREc, 2) }}</b></th>
-                <th class="text-end"><b>{{ number_format($totalStockval, 2) }}</b></th>
-                <th class="text-end"><b>{{ number_format($totalIssVal, 2) }}</b></th>
-                <th class="text-end"><b>{{ number_format($totalClVal, 2) }}</b></th>
+                <th class="text-end"><b>{{ rp_amt($totalBF) }}</b></th>
+                <th class="text-end"><b>{{ rp_amt($totalREc) }}</b></th>
+                <th class="text-end"><b>{{ rp_amt($totalStockval) }}</b></th>
+                <th class="text-end"><b>{{ rp_amt($totalIssVal) }}</b></th>
+                <th class="text-end"><b>{{ rp_amt($totalClVal) }}</b></th>
             </tr>
         </tfoot>
     </table>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stock Received Items Report</title>
+<title>Stock Report</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -481,8 +481,8 @@ tfoot td {
       </div>
     </div>
     <div class="report-title-block">
-      <div class="report-title">Received Items Report</div>
-      <div class="report-sub">Central   Stores Department</div>
+      <div class="report-title">Stock Report</div>
+      <div class="report-sub">{{ $store->name ?? 'Store' }}</div>
     </div>
   </div>
 
@@ -550,7 +550,7 @@ tfoot td {
 
   <!-- TABLE -->
   <div class="table-section">
-    <div class="table-header-bar">Received Item Breakdown — Stock Items</div>
+    <div class="table-header-bar">Stock On Hand — {{ $store->name ?? 'Store' }}</div>
     <table>
        <thead>
                                         <tr class="bg-l-gradient-light theme-green">
@@ -593,9 +593,9 @@ tfoot td {
                                                 <td>{{ $lists->item_code }}</td>
                                                 <td>{{ $lists->name }}</td>
                                                 <td>{{ $lists->unitname->name ?? '' }}</td>
-                                                <td>{{ $qty ?? 0 }}</td>
-                                                <td>{{ number_format($unitCost ?? 0, 2) }}</td>
-                                                <td>{{ number_format($totalAmount ?? 0, 2) }}</td>
+                                                <td>{{ rp_qty($qty ?? 0) }}</td>
+                                                <td>{{ rp_amt($unitCost ?? 0) }}</td>
+                                                <td>{{ rp_amt($totalAmount ?? 0) }}</td>
                                             </tr>
                                             @endforeach
                                             

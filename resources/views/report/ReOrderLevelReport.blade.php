@@ -47,8 +47,8 @@ $breadcrumbLabel = 'Reorder Level Report';
                 <td>{{ $lists->categoryname->name }}</td>
                 <td>{{ $lists->unitname->name }}</td>
                 <td>{{ $lists->storename->name }}</td>
-                <td><b>{{ $lists->reorder_level }}</b></td>
-                <td><b>{{ $lists->total_qty ?? 0 }}</b></td>
+                <td><b>{{ rp_qty($lists->reorder_level) }}</b></td>
+                <td><b>{{ rp_qty($lists->total_qty ?? 0) }}</b></td>
             </tr>
             @endforeach
             @endif

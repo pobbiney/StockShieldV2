@@ -8,30 +8,11 @@ $breadcrumbLabel = 'Department Issues — By Item';
 $backUrl = route('IssuedItemsReport');
 @endphp
 
-@push('report-css')
-<style>
-    .select2-container .select2-selection--single { height: 42px !important; padding-top: 6px; }
-    .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 28px; }
-    .select2-container--default .select2-selection--single .select2-selection__arrow { height: 42px; }
-</style>
-@endpush
-
 @section('filter')
 <form method="POST" action="{{ route('report.searchbyIssueItemDepartment-report') }}">
     @csrf
     <div class="rp-filter-grid">
-        <div>
-            <label class="form-label">Item</label>
-            <select class="js-example-basic-single form-select" name="item">
-                <option value="" disabled {{ old('item', request('item')) ? '' : 'selected' }}>Choose item</option>
-                @foreach ($getItemid as $listitems)
-                    <option value="{{ $listitems->id }}" {{ (string) old('item', request('item')) === (string) $listitems->id ? 'selected' : '' }}>
-                        {{ $listitems->name }}
-                    </option>
-                @endforeach
-            </select>
-            @error('item') <small class="text-danger">{{ $message }}</small> @enderror
-        </div>
+        @include('report.partials.item-select')
         @include('report.partials.store-select')
         <div><button type="submit" class="btn-rp-search w-100"><i class="bi bi-search"></i> Search</button></div>
     </div>
@@ -80,16 +61,16 @@ $backUrl = route('IssuedItemsReport');
                 <td>{{ $lists->invoice_number }}</td>
                 <td>{{ $lists->staffname->name }}</td>
                 <td>{{ Carbon\Carbon::parse($lists->created_at)->format('F jS, Y \a\t h:i A') }}</td>
-                <td><b>{{ $lists->qty }}</b></td>
-                <td><b>{{ $lists->amount }}</b></td>
-                <td><b>{{ number_format($lineTotal, 2) }}</b></td>
+                <td><b>{{ rp_qty($lists->qty) }}</b></td>
+                <td><b>{{ rp_amt($lists->amount) }}</b></td>
+                <td><b>{{ rp_amt($lineTotal) }}</b></td>
             </tr>
             @endforeach
             <tr>
                 <td colspan="9"><b style="float: right">TOTAL</b></td>
-                <td><b>{{ $totalqty }}</b></td>
+                <td><b>{{ rp_qty($totalqty) }}</b></td>
                 <td><b></b></td>
-                <td><b>{{ number_format($grandTotal, 2) }}</b></td>
+                <td><b>{{ rp_amt($grandTotal) }}</b></td>
             </tr>
         </tbody>
     </table>

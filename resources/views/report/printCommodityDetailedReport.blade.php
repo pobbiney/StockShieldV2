@@ -518,19 +518,17 @@ tfoot td {
                                             <th>ID</th>
                                             <th>Item Description</th>
                                             <th>UoM</th>
-                                            <th>Price</th>
-                                            <th>Balance B/F </th>
-                                            <th>Balance B/F Value  </th>
-                                            <th>Receipts </th>
-                                            
-                                            <th >Receipt Value  </th>
-                                            <th >Total Stock   </th>
-                                            <th >Total Stock  Value  </th>
-                                            
-                                            <th>Issued </th>
-                                            <th>Issued Value  </th>
-                                            <th>Closing Balance</th>
-                                            <th>Closing Balance Value  </th>
+                                            <th>Price GHS</th>
+                                            <th>Balance B/F (Qty)</th>
+                                            <th>Balance B/F Value GHS</th>
+                                            <th>Receipts (Qty)</th>
+                                            <th>Receipt Value GHS</th>
+                                            <th>Total Stock (Qty)</th>
+                                            <th>Total Stock Value GHS</th>
+                                            <th>Issued (Qty)</th>
+                                            <th>Issued Value GHS</th>
+                                            <th>Closing Balance (Qty)</th>
+                                            <th>Closing Balance Value GHS</th>
                                             
                                             
                                                 
@@ -548,18 +546,18 @@ tfoot td {
                                          <td>{{ $loop->iteration }}</td>
                                         <td>{{ $item['item_description'] }}</td>
                                         <td>{{ $item['uom'] }}</td>
-                                        <td class="text-end">{{ $item['price'] }}</td>
-                                        <td class="text-end">{{ number_format($item['balance_bf_qty']) }}</td>
-                                        <td class="text-end">{{ $item['balance_bf_value'] }}</td>
-                                        <td class="text-end">{{ number_format($item['receipts_qty']) }}</td>
-                                        <td class="text-end">{{ $item['receipts_value'] }}</td>
+                                        <td class="text-end">{{ rp_amt($item['price']) }}</td>
+                                        <td class="text-end">{{ rp_qty($item['balance_bf_qty']) }}</td>
+                                        <td class="text-end">{{ rp_amt($item['balance_bf_value']) }}</td>
+                                        <td class="text-end">{{ rp_qty($item['receipts_qty']) }}</td>
+                                        <td class="text-end">{{ rp_amt($item['receipts_value']) }}</td>
                                        
-                                        <td class="text-end">{{ number_format($item['total_stock_qty']) }}</td>
-                                        <td class="text-end">{{ $item['total_stock_value'] }}</td>
-                                        <td class="text-end">{{ number_format($item['issued_qty']) }}</td>
-                                        <td class="text-end">{{ $item['issued_value'] }}</td>
-                                        <td class="text-end  ">{{ number_format($item['closing_balance_qty']) }}</td>
-                                        <td class="text-end  ">{{ $item['closing_balance_value'] }}</td>
+                                        <td class="text-end">{{ rp_qty($item['total_stock_qty']) }}</td>
+                                        <td class="text-end">{{ rp_amt($item['total_stock_value']) }}</td>
+                                        <td class="text-end">{{ rp_qty($item['issued_qty']) }}</td>
+                                        <td class="text-end">{{ rp_amt($item['issued_value']) }}</td>
+                                        <td class="text-end">{{ rp_qty($item['closing_balance_qty']) }}</td>
+                                        <td class="text-end">{{ rp_amt($item['closing_balance_value']) }}</td>
                                     </tr>
 
             @endforeach

@@ -203,6 +203,7 @@ Route::post('reverse-entry/{reversal}/reject', [ReverseEntryController::class, '
 /* Reports */
 Route::get('ItemReport',[ReportController::class,'getItemReportView'])->name('ItemReport');
 Route::post('ItemReport',[ReportController::class,'searchStockReport'])->name('report.stock-report');
+Route::match(['get', 'post'], '/item-report-print/{department}', [ReportController::class, 'printItemReport'])->middleware('auth')->name('report.item-report-print');
 Route::get('ReceivedStocks',[ReportController::class,'getReceivedStocksView'])->name('ReceivedStocks');
 Route::post('ReceivedStocks',[ReportController::class,'searchReceivedStockReport'])->name('report.stockreceived-report');
 Route::get('/received-stock-print/{department}',

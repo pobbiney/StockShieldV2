@@ -596,9 +596,9 @@ tfoot td {
                 <td>{{ $lists->invoice_number}}</td>
                 <td>{{ $lists->staffname->name}}</td>
                 <td>{{ Carbon\Carbon::parse($lists->created_at)->format('F jS, Y \a\t h:i A') }} </td>
-                <td><b>{{ $lists->qty}}</b></td>
-                <td><b>{{ $lists->amount}}</b></td>
-                <td><b>{{ number_format($lineTotal,2)}}</b></td>
+                <td><b>{{ rp_qty($lists->qty) }}</b></td>
+                <td><b>{{ rp_amt($lists->amount) }}</b></td>
+                <td><b>{{ rp_amt($lineTotal) }}</b></td>
                                                 
                 
         
@@ -612,10 +612,10 @@ tfoot td {
       <tfoot>
         <tr>
           <td colspan="9"><b style="float: right">TOTAL</b></td>
-                                                <td><b>{{ $totalqty }}</b></td>
+                                                <td><b>{{ rp_qty($totalqty) }}</b></td>
                                                 <td><b></b></td>
                                                 
-                                                <td><b>{{ number_format($grandTotal,2)}}</b></td>
+                                                <td><b>{{ rp_amt($grandTotal) }}</b></td>
         </tr>
       </tfoot>
     </table>

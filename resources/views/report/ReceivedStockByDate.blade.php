@@ -71,16 +71,16 @@ $activeRoute = 'ReceivedStockByDate';
                 <td>{{ $lists->expiry_date }}</td>
                 <td>{{ $lists->award_letter }}</td>
                 <td>{{ $lists->staffname->name }}</td>
-                <td>{{ $lists->amount ?? '' }}</td>
-                <td>{{ $lists->qty ?? '' }}</td>
-                <td>{{ number_format($lineTotal, 2) }}</td>
+                <td>{{ rp_amt($lists->amount) }}</td>
+                <td>{{ rp_qty($lists->qty) }}</td>
+                <td>{{ rp_amt($lineTotal) }}</td>
             </tr>
             @endforeach
             <tr>
                 <td colspan="11"><b style="float: right">TOTAL</b></td>
                 <td></td>
-                <td><b>{{ $totalqty }}</b></td>
-                <td><b>{{ number_format($grandTotal, 2) }}</b></td>
+                <td><b>{{ rp_qty($totalqty) }}</b></td>
+                <td><b>{{ rp_amt($grandTotal) }}</b></td>
             </tr>
         </tbody>
     </table>

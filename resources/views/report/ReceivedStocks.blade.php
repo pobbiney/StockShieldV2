@@ -70,9 +70,9 @@ $activeRoute = 'ReceivedStocks';
                 <td>{{ $lists->expiry_date ?? '' }}</td>
                 <td>{{ $lists->award_letter ?? '' }}</td>
                 <td>{{ $lists->staffname->name ?? '' }}</td>
-                <td>{{ $lists->amount ?? '' }}</td>
-                <td>{{ $lists->qty ?? '' }}</td>
-                <td>{{ number_format($lineTotal, 2) }}</td>
+                <td>{{ rp_amt($lists->amount) }}</td>
+                <td>{{ rp_qty($lists->qty) }}</td>
+                <td>{{ rp_amt($lineTotal) }}</td>
             </tr>
             @endforeach
         </tbody>
@@ -90,8 +90,8 @@ $activeRoute = 'ReceivedStocks';
                 <td></td>
                 <td class="text-end fw-bold">TOTAL</td>
                 <td></td>
-                <td class="fw-bold">{{ $totalqty }}</td>
-                <td class="fw-bold">{{ number_format($grandTotal, 2) }}</td>
+                <td class="fw-bold">{{ rp_qty($totalqty) }}</td>
+                <td class="fw-bold">{{ rp_amt($grandTotal) }}</td>
             </tr>
         </tfoot>
     </table>

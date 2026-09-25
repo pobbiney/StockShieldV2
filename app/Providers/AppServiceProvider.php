@@ -21,6 +21,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        require_once app_path('Support/report_format.php');
+
         View::composer(['layouts.backendapp', 'dashboard'], function ($view) {
             $view->with(app(StockAlertService::class)->getAlerts());
         });

@@ -577,10 +577,8 @@ tfoot td {
                         <td>{{$lists->categoryname->name}}</td>
                         <td>{{$lists->unitname->name}}</td>
                         <td>{{$lists->storename->name}}</td>
-                        <td>  <b> {{ $lists->reorder_level }}</b>
-                        <td><b>{{ $lists->total_qty ?? 0 }}</b></td>
-                
-                        </td>
+                        <td><b>{{ rp_qty($lists->reorder_level) }}</b></td>
+                        <td><b>{{ rp_qty($lists->total_qty ?? 0) }}</b></td>
                             
                     </tr>
                         

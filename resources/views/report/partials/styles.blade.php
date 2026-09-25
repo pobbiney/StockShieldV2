@@ -126,35 +126,145 @@
     .rp-alert.error   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
 
     .rp-filter-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1rem;
+        display: flex;
+        flex-wrap: wrap;
         align-items: end;
+        gap: 1rem;
+    }
+
+    .rp-filter-grid > * {
+        flex: 1 1 200px;
+        min-width: 180px;
+    }
+
+    .rp-filter-grid > *:has(.btn-rp-search) {
+        flex: 0 1 180px;
+        min-width: 160px;
     }
 
     .rp-filter-grid .form-label {
-        font-size: 0.78rem;
-        font-weight: 600;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
         color: #64748b;
-        margin-bottom: 0.35rem;
+        margin-bottom: 0.4rem;
+    }
+
+    .rp-select-wrap { position: relative; }
+
+    .rp-select-wrap > i {
+        position: absolute;
+        left: 0.9rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #4f46e5;
+        font-size: 1rem;
+        pointer-events: none;
+        z-index: 2;
+    }
+
+    .rp-select-wrap:has(select:not(.js-example-basic-single))::after {
+        content: '\F282';
+        font-family: 'bootstrap-icons';
+        position: absolute;
+        right: 0.95rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #4f46e5;
+        pointer-events: none;
+        font-size: 0.85rem;
+    }
+
+    .rp-filter-grid .form-select,
+    .rp-filter-grid .form-control,
+    .rp-select {
+        appearance: none;
+        width: 100%;
+        height: 48px;
+        padding: 0 1rem;
+        border: 1.5px solid #c7d2fe;
+        border-radius: 0.85rem;
+        background: #eef2ff;
+        color: #1e1b4b;
+        font-size: 0.92rem;
+        font-weight: 600;
+        box-shadow: inset 0 1px 2px rgba(79, 70, 229, 0.06);
+    }
+
+    .rp-select-wrap .form-select,
+    .rp-select-wrap .form-control,
+    .rp-select-wrap .rp-select {
+        padding-left: 2.55rem;
+        padding-right: 2.4rem;
+    }
+
+    .rp-filter-grid .form-select:focus,
+    .rp-filter-grid .form-control:focus,
+    .rp-select:focus {
+        outline: none;
+        border-color: #4f46e5;
+        background: #fff;
+        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15);
+    }
+
+    .rp-page .select2-container { width: 100% !important; }
+
+    .rp-select-wrap .select2-container .select2-selection--single {
+        padding-left: 2.2rem !important;
+    }
+
+    .rp-page .select2-container .select2-selection--single {
+        height: 48px !important;
+        padding: 0 0.75rem !important;
+        display: flex !important;
+        align-items: center;
+        border: 1.5px solid #c7d2fe !important;
+        border-radius: 0.85rem !important;
+        background: #eef2ff !important;
+        box-shadow: inset 0 1px 2px rgba(79, 70, 229, 0.06);
+    }
+
+    .rp-page .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 46px !important;
+        color: #1e1b4b !important;
+        font-weight: 600;
+        padding-left: 0 !important;
+    }
+
+    .rp-page .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 46px !important;
+        right: 8px;
+    }
+
+    .rp-page .select2-container--default.select2-container--focus .select2-selection--single,
+    .rp-page .select2-container--default.select2-container--open .select2-selection--single {
+        border-color: #4f46e5 !important;
+        background: #fff !important;
+        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15);
     }
 
     .btn-rp-search {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 0.4rem;
-        padding: 0.6rem 1.25rem;
-        border-radius: 0.625rem;
+        gap: 0.45rem;
+        padding: 0 1.4rem;
+        border-radius: 0.85rem;
         border: none;
-        background: #4f46e5;
+        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
         color: #fff;
-        font-size: 0.875rem;
-        font-weight: 600;
-        height: 42px;
+        font-size: 0.92rem;
+        font-weight: 700;
+        height: 48px;
+        min-width: 160px;
+        box-shadow: 0 8px 18px rgba(79, 70, 229, 0.28);
     }
 
-    .btn-rp-search:hover { background: #4338ca; color: #fff; }
+    .btn-rp-search:hover {
+        background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+        color: #fff;
+    }
 
     .btn-rp-print {
         display: inline-flex;
