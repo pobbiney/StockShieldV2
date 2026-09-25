@@ -739,7 +739,7 @@ class StockController extends Controller
             'item_id'            => $request->item,
             'batch_number'       => $batchNumber,
             'manufacturing_date' => $request->manufacturing_date,
-            'expiry_date'        => $request->expiry_date,
+            'expiry_date'        => StockApprovalService::normalizeDate($request->expiry_date),
             'supplier_id'        => $request->supplier,
             'purchase_order'     => $request->purchase_order,
             'waybill'            => $request->waybill,
@@ -781,7 +781,7 @@ class StockController extends Controller
     $insertCat->item_id = $request->item;
     $insertCat->batch_number = $batchNumber;
     $insertCat->manufacturing_date = $request->manufacturing_date;
-    $insertCat->expiry_date = $request->expiry_date;
+    $insertCat->expiry_date = StockApprovalService::normalizeDate($request->expiry_date);
     $insertCat->supplier_id = $request->supplier;
     $insertCat->purchase_order = $request->purchase_order;
     $insertCat->waybill = $request->waybill;
@@ -878,7 +878,7 @@ class StockController extends Controller
         $entry->item_id = $request->item;
         $entry->batch_number = $batchNumber;
         $entry->manufacturing_date = $request->manufacturing_date;
-        $entry->expiry_date = $request->expiry_date;
+        $entry->expiry_date = StockApprovalService::normalizeDate($request->expiry_date);
         $entry->supplier_id = $request->supplier;
         $entry->purchase_order = $request->purchase_order;
         $entry->waybill = $request->waybill;
@@ -910,7 +910,7 @@ class StockController extends Controller
     $insertCat->item_id = $request->item;
     $insertCat->batch_number = $batchNumber;
     $insertCat->manufacturing_date = $request->manufacturing_date;
-    $insertCat->expiry_date = $request->expiry_date;
+    $insertCat->expiry_date = StockApprovalService::normalizeDate($request->expiry_date);
     $insertCat->supplier_id = $request->supplier;
     $insertCat->purchase_order = $request->purchase_order;
     $insertCat->waybill = $request->waybill;
@@ -1246,8 +1246,7 @@ class StockController extends Controller
         }
 
         $approvedRequests = ItemRequest::with(['storename', 'staffname', 'itemname'])
-            ->whereIn('item_store_id', $storeIds)
-            ->where('status', 'request approved')
+            ->approvedForIssuingStores($storeIds, $this->storeContext->hasGlobalStoreAccess())
             ->orderByDesc('created_at')
             ->get();
 

@@ -147,8 +147,8 @@ class SettingsController extends Controller
             $insertCat->name = trim($request->name);
             $insertCat->status = $request->status;
             $insertCat->store_group = $request->store_group;
-          
-           
+            $this->applyRequisitionRouting($insertCat, $request);
+
             $insertCat = $insertCat->save();
             return $insertCat ? back()->with('message_success','Store   added successfully') : back()->with('message_error','Something went wrong, please try again.');
     }
@@ -165,20 +165,38 @@ class SettingsController extends Controller
             $insertCat->name = trim($request->name);
             $insertCat->status = $request->status;
             $insertCat->store_group = $request->store_group;
-
-            if ($insertCat->store_group !== 'satellite') {
-                $insertCat->route_requisitions_to_hub = false;
-                if ($insertCat->is_requisition_hub) {
-                    $insertCat->is_requisition_hub = false;
-                }
-            } elseif ($insertCat->is_requisition_hub) {
-                $insertCat->route_requisitions_to_hub = false;
-            } else {
-                $insertCat->route_requisitions_to_hub = $request->boolean('route_requisitions_to_hub');
-            }
+            $this->applyRequisitionRouting($insertCat, $request);
 
             $insertCat = $insertCat->save();
             return $insertCat ? back()->with('message_success','Store updated successfully') : back()->with('message_error','Something went wrong, please try again.');
+    }
+
+    protected function applyRequisitionRouting(Store $store, Request $request): void
+    {
+        if ($store->store_group !== 'satellite') {
+            $store->route_requisitions_to_hub = false;
+            $store->route_requisitions_to_central = true;
+            if ($store->is_requisition_hub) {
+                $store->is_requisition_hub = false;
+            }
+            return;
+        }
+
+        if ($store->is_requisition_hub) {
+            $store->route_requisitions_to_hub = false;
+            $store->route_requisitions_to_central = false;
+            return;
+        }
+
+        $toHub = $request->boolean('route_requisitions_to_hub');
+        $toCentral = $request->boolean('route_requisitions_to_central');
+
+        if (!$toHub && !$toCentral) {
+            $toCentral = true;
+        }
+
+        $store->route_requisitions_to_hub = $toHub;
+        $store->route_requisitions_to_central = $toCentral;
     }
 
     public function setRequisitionHub(Request $request)
@@ -200,6 +218,7 @@ class SettingsController extends Controller
 
             $hub->is_requisition_hub = true;
             $hub->route_requisitions_to_hub = false;
+            $hub->route_requisitions_to_central = false;
             $hub->save();
         }
 

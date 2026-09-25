@@ -64,6 +64,87 @@ class RequisitionController extends Controller
         return $activeStoreId ? Store::find($activeStoreId) : null;
     }
 
+    /**
+     * Central pick lists cover stock issued from this store and stock issued to it.
+     */
+    protected function scopePickListStores($query, array $storeIds)
+    {
+        return $query->where(function ($query) use ($storeIds) {
+            $query->whereIn('store_id', $storeIds)
+                ->orWhereIn('issue_to', $storeIds);
+        });
+    }
+
+    /**
+     * Include mapped satellite stores when the user has both central and satellite access.
+     */
+    protected function pickListStoreIds(): array
+    {
+        $user = Auth::user();
+        $scoped = $this->storeContext->getScopedStoreIds($user);
+
+        if (!$user || $this->storeContext->hasGlobalStoreAccess($user)) {
+            return $scoped;
+        }
+
+        $mapped = $this->storeContext->getMappedStoreIds($user);
+
+        if (count($mapped) < 2) {
+            return $scoped;
+        }
+
+        $groups = Store::whereIn('id', $mapped)->pluck('store_group')->unique()->filter();
+
+        if ($groups->contains('central') && $groups->contains('satellite')) {
+            return array_values(array_unique(array_merge($scoped, $mapped)));
+        }
+
+        return $scoped;
+    }
+
+    protected function mapSatelliteIssueGroupToPickRow($lines): object
+    {
+        $first = $lines->first();
+
+        return (object) [
+            'pick_type'       => 'satellite_issue',
+            'reference_no'    => $first->requisition_no,
+            'issue_no'        => null,
+            'requisition_no'  => $first->requisition_no,
+            'invoice_number'  => $first->invoice_number,
+            'issuefrom'       => $first->issuefrom,
+            'storename'       => $first->storename,
+            'central_store'   => $first->issuefrom,
+            'to_store'        => $first->storename,
+            'ward_label'      => null,
+            'issued_by'       => $first->authorised,
+            'status'          => $first->status ?? 'issued',
+            'updated_at'      => $lines->max('updated_at'),
+            'line_count'      => $lines->count(),
+            'unique_items'    => $lines->pluck('item_id')->unique()->count(),
+            'total_qty'       => (int) $lines->sum('qty'),
+            'issued_at'       => $lines->max('updated_at'),
+        ];
+    }
+
+    protected function satellitePickListRows(array $storeIds)
+    {
+        if (empty($storeIds)) {
+            return collect();
+        }
+
+        $lines = SatelliteItemIssue::with(['issuefrom', 'storename', 'authorised'])
+            ->awaitingReceipt();
+        $this->scopePickListStores($lines, $storeIds);
+
+        return $lines
+            ->orderByDesc('updated_at')
+            ->get()
+            ->groupBy('requisition_no')
+            ->map(fn ($group) => $this->mapSatelliteIssueGroupToPickRow($group))
+            ->values();
+    }
+
     protected function isSatellitePickListContext(): bool
     {
         $activeStore = $this->resolveActiveStore();
@@ -134,7 +215,7 @@ class RequisitionController extends Controller
             ->orderByDesc('updated_at')
             ->get();
 
-        $satelliteTransferLines = SatelliteItemIssue::with(['issuefrom', 'staffname', 'authorised'])
+        $satelliteTransferLines = SatelliteItemIssue::with(['issuefrom', 'staffname', 'authorised', 'storename'])
             ->where('issue_to', $activeStoreId)
             ->awaitingReceipt()
             ->orderByDesc('updated_at')
@@ -152,6 +233,7 @@ class RequisitionController extends Controller
                     'requisition_no'  => $first->requisition_no,
                     'invoice_number'  => $first->invoice_number,
                     'central_store'   => $first->issuefrom,
+                    'to_store'        => $first->storename ?? null,
                     'ward_label'      => null,
                     'issued_by'       => $first->authorised,
                     'line_count'      => $lines->count(),
@@ -161,8 +243,18 @@ class RequisitionController extends Controller
                 ];
             });
 
+        $outboundSatelliteIssues = SatelliteItemIssue::with(['issuefrom', 'storename', 'authorised'])
+            ->where('store_id', $activeStoreId)
+            ->where('issue_to', '!=', $activeStoreId)
+            ->awaitingReceipt()
+            ->orderByDesc('updated_at')
+            ->get()
+            ->groupBy('requisition_no')
+            ->map(fn ($lines) => $this->mapSatelliteIssueGroupToPickRow($lines));
+
         return $wardIssues
             ->concat($centralTransfers)
+            ->concat($outboundSatelliteIssues)
             ->sortByDesc(fn ($group) => $group->issued_at)
             ->values();
     }
@@ -176,7 +268,6 @@ class RequisitionController extends Controller
         }
 
         $activeStore = Store::find($activeStoreId);
-        $centralStoreIds = $this->centralStoreIds();
 
         $getItemid = Item::with('unitname')
             ->where('status', 'Active')
@@ -193,23 +284,24 @@ class RequisitionController extends Controller
         $totalQtyRequested = (int) $cartItems->sum('qty_requested');
         $uniqueItems = $cartItems->pluck('item_id')->unique()->count();
 
-        $centralStores = !empty($centralStoreIds)
-            ? Store::whereIn('id', $centralStoreIds)->orderBy('name')->get()
-            : collect();
-
-        $fulfillmentLabel = $activeStore
-            ? $this->requisitionFulfillment->fulfillmentLabelForRequestingStore($activeStore)
-            : 'Central Stores';
-        $routesToHub = $activeStore && $this->requisitionFulfillment->shouldRouteToHub($activeStore);
+        $requestFromStores = Store::requestFromStores();
+        $centralStores = $requestFromStores;
+        $fulfillmentLabel = $requestFromStores->pluck('name')->join(', ') ?: 'Central Stores';
+        $routingMode = $activeStore
+            ? $this->requisitionFulfillment->routingMode($activeStore)
+            : 'central';
+        $routesToHub = in_array($routingMode, ['hub', 'both'], true);
 
         return view('requisition.Requisition', [
             'getItemid'          => $getItemid,
             'listitemissue'      => $cartItems,
             'activeStore'        => $activeStore,
             'centralStores'      => $centralStores,
+            'requestFromStores'  => $requestFromStores,
             'fulfillmentLabel'   => $fulfillmentLabel,
+            'routingMode'        => $routingMode,
             'routesToHub'        => $routesToHub,
-            'requisitionHub'     => $routesToHub ? $this->requisitionFulfillment->hubStore() : null,
+            'requisitionHub'     => $this->requisitionFulfillment->hubStore(),
             'pendingCount'       => $pendingCount,
             'totalQtyRequested'  => $totalQtyRequested,
             'uniqueItems'        => $uniqueItems,
@@ -218,9 +310,12 @@ class RequisitionController extends Controller
 
     public function addRequest(Request $request)
     {
+        $allowedStoreIds = Store::requestFromStores()->pluck('id')->map(fn ($id) => (int) $id)->all();
+
         $request->validate([
-            'item'     => 'required|integer|exists:items,id',
-            'quantity' => 'required|numeric|min:1',
+            'item'           => 'required|integer|exists:items,id',
+            'quantity'       => 'required|numeric|min:1',
+            'item_store_id'  => ['required', 'integer', 'in:' . implode(',', $allowedStoreIds ?: [0])],
         ]);
 
         $activeStoreId = $this->resolveActiveStoreId();
@@ -238,14 +333,17 @@ class RequisitionController extends Controller
             );
         }
 
-        $activeStore = Store::find($activeStoreId);
+        $fulfillmentStore = Store::find((int) $request->item_store_id);
 
-        if (!$activeStore) {
-            return redirect()->route('choose-store');
+        if (!$fulfillmentStore) {
+            return redirect()->route('Requisition')->with(
+                'message_error',
+                'Select the store you are requesting from.'
+            );
         }
 
         try {
-            $lineMeta = $this->requisitionFulfillment->resolveLineMetadata($activeStore, $item);
+            $lineMeta = $this->requisitionFulfillment->resolveLineMetadataForFulfillmentStore($fulfillmentStore, $item);
         } catch (RuntimeException $e) {
             return redirect()->route('Requisition')->with('message_error', $e->getMessage());
         }
@@ -321,17 +419,27 @@ class RequisitionController extends Controller
 
         $itemCount = $requests->count();
         $storeName = Store::find($activeStoreId)?->name ?? 'Store';
-        $fulfillStoreId = (int) ($requests->first()->item_store_id ?? 0);
+        $fulfillStoreIds = $requests->pluck('item_store_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
 
-        $this->notifications->notifyUsersForAction(
-            NotificationService::TYPE_REQUISITION_SUBMITTED,
-            'New Requisition Submitted',
-            "{$storeName} submitted {$requestNo} with {$itemCount} item(s) awaiting approval.",
-            'ApproveRequest',
-            $requestNo,
-            $fulfillStoreId ?: null,
-            [Auth::id()]
-        );
+        if ($fulfillStoreIds->isEmpty()) {
+            $fulfillStoreIds = collect([null]);
+        }
+
+        foreach ($fulfillStoreIds as $fulfillStoreId) {
+            $this->notifications->notifyUsersForAction(
+                NotificationService::TYPE_REQUISITION_SUBMITTED,
+                'New Requisition Submitted',
+                "{$storeName} submitted {$requestNo} with {$itemCount} item(s) awaiting approval.",
+                'ApproveRequest',
+                $requestNo,
+                $fulfillStoreId ?: null,
+                [Auth::id()]
+            );
+        }
 
         return redirect()->route('Requisition')->with(
             'message_success',
@@ -532,21 +640,33 @@ class RequisitionController extends Controller
             ]);
         }
 
-        $listdept = $this->storeContext->getScopedStoreIds();
+        $listdept = $this->pickListStoreIds();
 
         $listrequest = ItemIssue::with(['issuefrom', 'storename'])
-            ->whereIn('issue_to', $listdept)
             ->whereIn('id', function ($query) use ($listdept) {
                 $query->selectRaw('MAX(id)')
                     ->from('item_issues')
-                    ->whereIn('issue_to', $listdept)
-                    ->where('status', 'issued')
+                    ->where('status', 'issued');
+                $this->scopePickListStores($query, $listdept)
                     ->groupBy('requisition_no');
             })
             ->orderByDesc('id')
             ->get();
 
-        return view('requisition.PickList', ['listrequest' => $listrequest]);
+        $existingReqNos = $listrequest->pluck('requisition_no')->filter()->all();
+        $satelliteRows = $this->satellitePickListRows($listdept)
+            ->reject(fn ($row) => in_array($row->requisition_no, $existingReqNos, true))
+            ->values();
+
+        $listrequest = $listrequest
+            ->concat($satelliteRows)
+            ->sortByDesc(fn ($row) => $row->updated_at)
+            ->values();
+
+        return view('requisition.PickList', [
+            'listrequest' => $listrequest,
+            'activeStore' => $this->resolveActiveStore(),
+        ]);
     }
 
     public function getviewPickList($requisition_no)
@@ -600,6 +720,44 @@ class RequisitionController extends Controller
                 ]);
             }
 
+            $satelliteIssueLines = SatelliteItemIssue::with([
+                'itemcode',
+                'itemname.unitname',
+                'issuefrom',
+                'storename',
+                'staffname',
+                'authorised',
+            ])
+                ->where('requisition_no', $decodeID)
+                ->awaitingReceipt()
+                ->where(function ($query) use ($activeStoreId) {
+                    $query->where('store_id', $activeStoreId)
+                        ->orWhere('issue_to', $activeStoreId);
+                })
+                ->orderBy('batch_number')
+                ->orderBy('id')
+                ->get();
+
+            if ($satelliteIssueLines->isNotEmpty()) {
+                $first = $satelliteIssueLines->first();
+                $isOutbound = $satelliteIssueLines->contains(
+                    fn ($line) => (int) $line->store_id === $activeStoreId
+                );
+
+                return view('stock.viewPickUpSatellite', [
+                    'listrequest'   => $satelliteIssueLines,
+                    'activeStore'   => $activeStore,
+                    'pickType'      => $isOutbound ? 'satellite_issue' : 'central_transfer',
+                    'requisitionNo' => $decodeID,
+                    'issueNo'       => null,
+                    'invoiceNumber' => $first->invoice_number,
+                    'centralStore'  => $first->issuefrom,
+                    'toStore'       => $first->storename,
+                    'wardLabel'     => null,
+                    'issuedBy'      => $first->authorised,
+                ]);
+            }
+
             $listrequest = ItemIssue::with(['itemcode', 'itemname.unitname', 'issuefrom', 'staffname', 'authorised'])
                 ->where('issue_to', $activeStoreId)
                 ->where('requisition_no', $decodeID)
@@ -628,19 +786,63 @@ class RequisitionController extends Controller
             ]);
         }
 
-        $listdept = $this->storeContext->getScopedStoreIds();
+        $listdept = $this->pickListStoreIds();
 
-        $listrequest = ItemIssue::whereIn('issue_to', $listdept)
+        $centralLines = ItemIssue::with([
+            'itemcode',
+            'itemname.unitname',
+            'issuefrom',
+            'storename',
+            'staffname',
+            'authorised',
+        ]);
+        $this->scopePickListStores($centralLines, $listdept)
             ->where('requisition_no', $decodeID)
             ->where('status', 'issued')
-            ->orderByDesc('id')
-            ->get();
+            ->orderBy('batch_number')
+            ->orderBy('id');
+        $centralLines = $centralLines->get();
+
+        $satelliteLines = SatelliteItemIssue::with([
+            'itemcode',
+            'itemname.unitname',
+            'issuefrom',
+            'storename',
+            'staffname',
+            'authorised',
+        ]);
+        $this->scopePickListStores($satelliteLines, $listdept)
+            ->where('requisition_no', $decodeID)
+            ->awaitingReceipt()
+            ->orderBy('batch_number')
+            ->orderBy('id');
+        $satelliteLines = $satelliteLines->get();
+
+        $listrequest = $centralLines->concat($satelliteLines)->values();
 
         if ($listrequest->isEmpty()) {
             return redirect()->route('PickList')->with('message_error', 'Pick list not found.');
         }
 
-        return view('requisition.viewPickUp', ['listrequest' => $listrequest]);
+        $first = $listrequest->first();
+        $fromNames = $listrequest->map(fn ($line) => $line->issuefrom?->name)->filter()->unique()->values();
+        $toNames = $listrequest->map(fn ($line) => $line->storename?->name)->filter()->unique()->values();
+
+        return view('requisition.viewPickUp', [
+            'listrequest'   => $listrequest,
+            'activeStore'   => $this->resolveActiveStore(),
+            'requisitionNo' => $decodeID,
+            'invoiceNumber' => $listrequest->first(fn ($line) => $line->invoice_number)?->invoice_number ?? $first->invoice_number,
+            'fromStore'     => $first->issuefrom,
+            'toStore'       => $first->storename,
+            'fromStoreLabel'=> $fromNames->isNotEmpty() ? $fromNames->join(', ') : ($first->issuefrom?->name ?? 'store'),
+            'toStoreLabel'  => $toNames->isNotEmpty() ? $toNames->join(', ') : ($first->storename?->name ?? 'store'),
+            'issuedBy'      => $first->authorised,
+            'createdBy'     => $first->staffname,
+            'issuedAt'      => $listrequest->sortByDesc('updated_at')->first()?->updated_at,
+            'totalQty'      => (int) $listrequest->sum('qty'),
+            'uniqueItems'   => $listrequest->pluck('item_id')->unique()->count(),
+        ]);
     }
 
     public function printPickList($invoice)
@@ -662,21 +864,58 @@ class RequisitionController extends Controller
             return redirect()->back()->with('message_error', 'Please select your active store.');
         }
 
-        $issues = ItemIssue::where('invoice_number', $decodeID)
-            ->where('issue_to', (int) $activeStoreId)
-            ->first();
+        $storeIds = $this->pickListStoreIds();
 
-        if (!$issues) {
-            return redirect()->back()->with('message_error', 'Invoice not found.');
+        if (empty($storeIds) && $activeStoreId) {
+            $storeIds = [(int) $activeStoreId];
+        }
+
+        if (empty($storeIds)) {
+            return redirect()->back()->with('message_error', 'Please select your active store.');
+        }
+
+        $issueRelations = ['staffname', 'authorised', 'itemcode', 'itemname.unitname', 'itemRequest.staffname'];
+
+        $issues = $this->scopePickListStores(
+            ItemIssue::with($issueRelations)->where('invoice_number', $decodeID),
+            $storeIds
+        )->first();
+
+        $listissues = collect();
+
+        if ($issues) {
+            $listissues = $this->scopePickListStores(
+                ItemIssue::with($issueRelations)->where('invoice_number', $decodeID),
+                $storeIds
+            )->get();
+        } else {
+            $issues = $this->scopePickListStores(
+                SatelliteItemIssue::with($issueRelations)->where('invoice_number', $decodeID),
+                $storeIds
+            )->first();
+
+            if (!$issues) {
+                return redirect()->back()->with('message_error', 'Invoice not found.');
+            }
+
+            $listissues = $this->scopePickListStores(
+                SatelliteItemIssue::with($issueRelations)->where('invoice_number', $decodeID),
+                $storeIds
+            )->get();
         }
 
         $store   = Store::find($issues->store_id);
         $issueto = Store::find($issues->issue_to);
-        $listissues = ItemIssue::where('invoice_number', $decodeID)
-            ->where('issue_to', (int) $activeStoreId)
-            ->get();
+        $requestedBy = optional(optional($issues->itemRequest)->staffname)->name;
 
-        return view('requisition.print', compact('issues', 'decodeID', 'store', 'issueto', 'listissues'));
+        if (! $requestedBy && $issues->requisition_no) {
+            $requestLine = ItemRequest::with('staffname')
+                ->where('requisition_no', $issues->requisition_no)
+                ->first();
+            $requestedBy = optional(optional($requestLine)->staffname)->name;
+        }
+
+        return view('requisition.print', compact('issues', 'decodeID', 'store', 'issueto', 'listissues', 'requestedBy'));
     }
 
     public function getReturnView()

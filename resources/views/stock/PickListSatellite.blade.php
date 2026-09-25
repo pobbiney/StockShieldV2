@@ -55,7 +55,18 @@
 
     .pl-hero p { color: rgba(255, 255, 255, 0.88); font-size: 0.9rem; margin-bottom: 0; max-width: 620px; }
     .pl-hero .breadcrumb-item a { color: rgba(255, 255, 255, 0.65); }
+    .pl-hero .breadcrumb-item a:hover { color: #fff; }
     .pl-hero .breadcrumb-item.active { color: #fff; }
+
+    .stat-card { animation: plStatIn 0.5s ease both; }
+    .stat-card:nth-child(1) { animation-delay: 0.05s; }
+    .stat-card:nth-child(2) { animation-delay: 0.1s; }
+    .stat-card:nth-child(3) { animation-delay: 0.15s; }
+
+    @keyframes plStatIn {
+        from { opacity: 0; transform: translateY(16px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
 
     .stat-card {
         border-radius: 1.125rem;
@@ -185,6 +196,29 @@
         color: #2563eb;
     }
 
+    .pl-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .btn-print {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 0.5rem;
+        border: 1.5px solid rgba(146, 64, 14, 0.2);
+        background: #fff;
+        color: #92400e;
+        text-decoration: none;
+    }
+
+    .btn-print:hover { background: #fff7ed; color: #78350f; }
+
     .btn-pickup {
         display: inline-flex;
         align-items: center;
@@ -220,7 +254,7 @@
     }
 
     .pl-link-note {
-        margin-top: 1rem;
+        margin: 0 1.5rem 1.5rem;
         padding: 0.85rem 1rem;
         border-radius: 0.75rem;
         background: #fff7ed;
@@ -228,24 +262,42 @@
         font-size: 0.85rem;
         color: #92400e;
     }
+
+    .dataTables_wrapper { padding: 0 1rem 1rem; }
+    .dataTables_wrapper .dataTables_filter input {
+        border-radius: 0.625rem;
+        border: 1.5px solid #e2e8f0;
+        padding: 0.4rem 0.75rem;
+    }
 </style>
 @endsection
 
 @section('content')
-<div class="container-fluid pl-page mt-3">
-    <div class="pl-hero px-4 py-4 mb-4">
+<div class="container-fluid pl-page px-3 px-lg-4 mt-3">
+    <div class="pl-hero">
         <div class="pl-hero-inner">
-            <div class="pl-hero-badge">
-                <i class="bi bi-truck"></i> Satellite Pick List
+            <div class="row align-items-end g-3">
+                <div class="col-lg-8">
+                    <div class="pl-hero-badge">
+                        <i class="bi bi-truck"></i> Satellite Store — Pick List
+                    </div>
+                    <h2>Ready for Pick Up</h2>
+                    <p>
+                        View and print items issued from your satellite store to wards or other stores, and transfers awaiting pick-up.
+                        @if($activeStore ?? null)
+                            <span class="d-block mt-1 opacity-75"><i class="bi bi-building me-1"></i>{{ $activeStore->name }}</span>
+                        @endif
+                    </p>
+                </div>
+                <div class="col-lg-4 d-none d-lg-block text-end">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb justify-content-end mb-0" style="--bs-breadcrumb-divider:'›';">
+                            <li class="breadcrumb-item"><a href="{{ route('dashboard') }}" class="text-decoration-none">Dashboard</a></li>
+                            <li class="breadcrumb-item active" aria-current="page">Pick List</li>
+                        </ol>
+                    </nav>
+                </div>
             </div>
-            <h2>Pick List — {{ $activeStore->name ?? 'Satellite Store' }}</h2>
-            <p>View and print items issued from your satellite store to wards, and central transfers awaiting pick-up.</p>
-            <nav aria-label="breadcrumb" class="mt-3">
-                <ol class="breadcrumb mb-0">
-                    <li class="breadcrumb-item"><a href="#">Stock Management</a></li>
-                    <li class="breadcrumb-item active">Pick List</li>
-                </ol>
-            </nav>
         </div>
     </div>
 
@@ -292,7 +344,7 @@
                             <th>#</th>
                             <th>Type</th>
                             <th>Reference No</th>
-                            <th>Ward / From</th>
+                            <th>Ward / Store</th>
                             <th>Items</th>
                             <th>Qty</th>
                             <th>Issued</th>
@@ -307,6 +359,8 @@
                                 <td>
                                     @if(($pick->pick_type ?? '') === 'ward_issue')
                                         <span class="badge bg-warning-subtle text-warning-emphasis">Ward Issue</span>
+                                    @elseif(($pick->pick_type ?? '') === 'satellite_issue')
+                                        <span class="badge bg-success-subtle text-success-emphasis">Issued from store</span>
                                     @else
                                         <span class="badge bg-secondary-subtle text-secondary">From Central</span>
                                     @endif
@@ -317,6 +371,11 @@
                                         <span class="store-badge">
                                             <i class="bi bi-hospital"></i>
                                             {{ $pick->ward_label ?? '—' }}
+                                        </span>
+                                    @elseif(($pick->pick_type ?? '') === 'satellite_issue')
+                                        <span class="store-badge">
+                                            <i class="bi bi-geo-alt"></i>
+                                            To: {{ $pick->to_store->name ?? ($pick->storename->name ?? 'Store') }}
                                         </span>
                                     @else
                                         <span class="store-badge">
@@ -337,10 +396,20 @@
                                     </span>
                                 </td>
                                 <td>
-                                    <a href="{{ route('viewPickUp', Crypt::encrypt($pick->reference_no)) }}"
-                                       class="btn-pickup">
-                                        <i class="bi bi-truck"></i> Pick Up
-                                    </a>
+                                    <div class="pl-actions">
+                                        @if($pick->invoice_number ?? null)
+                                            <a href="{{ route('requisition.print', Crypt::encrypt($pick->invoice_number)) }}"
+                                               class="btn-print"
+                                               target="_blank"
+                                               title="Print invoice">
+                                                <i class="bi bi-printer"></i>
+                                            </a>
+                                        @endif
+                                        <a href="{{ route('viewPickUp', Crypt::encrypt($pick->reference_no)) }}"
+                                           class="btn-pickup">
+                                            <i class="bi bi-truck"></i> Pick Up
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
@@ -348,21 +417,19 @@
                 </table>
             </div>
 
-            <div class="px-4 pb-4">
-                <div class="pl-link-note">
-                    <i class="bi bi-info-circle me-1"></i>
-                    Ward issues are created via
-                    <a href="{{ route('IssueItemSatellite') }}" class="fw-semibold">Issue Item (Satellite)</a>.
-                    For stock from central, use
-                    <a href="{{ route('ReceiveStock') }}" class="fw-semibold">Receive Stock</a>
-                    after pick-up.
-                </div>
+            <div class="pl-link-note">
+                <i class="bi bi-info-circle me-1"></i>
+                Ward issues are created via
+                <a href="{{ route('IssueItemSatellite') }}" class="fw-semibold">Issue Item (Satellite)</a>.
+                Stock issued from this store to other stores also appears here. For inbound transfers, use
+                <a href="{{ route('ReceiveStock') }}" class="fw-semibold">Receive Stock</a>
+                after pick-up.
             </div>
         @else
             <div class="pl-empty">
                 <div class="pl-empty-visual"><i class="bi bi-truck"></i></div>
                 <h5 class="fw-semibold text-dark">No pick lists right now</h5>
-                <p class="text-muted mb-0">When you issue stock to wards via Issue Item (Satellite), or when central stores issue to {{ $activeStore->name ?? 'your store' }}, entries will appear here for pick-up and printing.</p>
+                <p class="text-muted mb-0">When you issue stock to wards or other stores, or when stock is issued to {{ $activeStore->name ?? 'your store' }}, entries will appear here for pick-up and printing.</p>
             </div>
         @endif
     </div>
@@ -372,11 +439,13 @@
 @section('scripts')
 <script>
 $(document).ready(function () {
-    if ($.fn.DataTable && $('#pickListTable tbody tr').length) {
+    if ($('#pickListTable').length && $.fn.DataTable && $('#pickListTable tbody tr').length) {
         $('#pickListTable').DataTable({
             order: [[6, 'desc']],
-            pageLength: 25,
-            language: { emptyTable: 'No pick lists available.' }
+            pageLength: 15,
+            lengthMenu: [[10, 15, 25, 50, -1], [10, 15, 25, 50, 'All']],
+            language: { search: '', searchPlaceholder: 'Search pick lists…', emptyTable: 'No pick lists available.' },
+            columnDefs: [{ orderable: false, targets: [0, 8] }],
         });
     }
 });

@@ -203,7 +203,8 @@
         min-height: 46px;
     }
 
-    .add-item-card .form-control:focus {
+    .add-item-card .form-control:focus,
+    .add-item-card .form-select:focus {
         border-color: #0d6efd;
         box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.12);
     }
@@ -677,14 +678,16 @@
                 <div class="col-lg-8">
                     <div class="req-hero-badge">
                         <i class="bi bi-arrow-left-right"></i>
-                        @if($routesToHub ?? false)
+                        @if(($routingMode ?? '') === 'both')
+                            Satellite → Hub &amp; Central
+                        @elseif($routesToHub ?? false)
                             Satellite → Hub Requisition
                         @else
                             Satellite → Central Requisition
                         @endif
                     </div>
-                    <h2>@if($routesToHub ?? false) Request Stock from Hub @else Request Stock from Central @endif</h2>
-                    <p>Build requisition drafts from central stock and submit for approval when ready.</p>
+                    <h2>Request Stock</h2>
+                    <p>Choose the store you are requesting from — central stores or Admin Store — Satellite — then add items to your draft.</p>
                     @if($activeStore)
                     <div class="store-context-banner">
                         <span class="store-chip"><i class="bi bi-shop"></i> {{ $activeStore->name }}</span>
@@ -750,7 +753,7 @@
             <form method="post" action="{{ route('add-request-process') }}" id="addRequestForm">
                 @csrf
                 <div class="row g-3 align-items-end">
-                    <div class="col-lg-5">
+                    <div class="col-lg-4">
                         <label class="form-label" for="req_item_search">Item</label>
                         <div class="item-autocomplete" id="reqItemAutocomplete">
                             <div class="item-autocomplete-input-wrap">
@@ -769,19 +772,31 @@
                         @error('item') <small class="text-danger">{{ $message }}</small> @enderror
                         <div class="field-hint">Click the field or type to search all items</div>
                     </div>
+                    <div class="col-lg-3">
+                        <label class="form-label" for="item_store_id">Request from</label>
+                        <select class="form-select" name="item_store_id" id="item_store_id" required>
+                            <option value="">Select store…</option>
+                            @foreach(($requestFromStores ?? $centralStores ?? collect()) as $fromStore)
+                                <option value="{{ $fromStore->id }}" @selected((string) old('item_store_id') === (string) $fromStore->id)>
+                                    {{ $fromStore->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('item_store_id') <small class="text-danger">{{ $message }}</small> @enderror
+                        <div class="field-hint">Central stores or Admin Store — Satellite</div>
+                    </div>
                     <div class="col-md-2">
                         <label class="form-label">UoM</label>
                         <input type="text" id="uom" class="form-control" readonly placeholder="—">
                          <div class="field-hint">Unit of measure</div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label">Quantity</label>
                         <input type="number" class="form-control" name="quantity" id="quantity" value="{{ old('quantity') }}" min="1" required placeholder="Qty">
                         <div class="field-hint">Enter any quantity you need</div>
-                        <!-- <div class="stock-hint" id="stock_hint"></div> -->
                         @error('quantity') <small class="text-danger">{{ $message }}</small> @enderror
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-md-1">
                         <button type="submit" class="btn-add-line">
                             <i class="bi bi-plus-lg"></i> Add
                         </button>
@@ -1173,6 +1188,13 @@ $(document).ready(function () {
             e.preventDefault();
             ReqAlert.error('Item Required', 'Please search and select an item from the list.');
             $('#req_item_search').focus();
+            return;
+        }
+
+        if (!$('#item_store_id').val()) {
+            e.preventDefault();
+            ReqAlert.error('Store Required', 'Please select the store you are requesting from.');
+            $('#item_store_id').focus();
         }
     });
 });

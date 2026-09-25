@@ -7,6 +7,7 @@ use App\Models\SatelliteStockEntry;
 use App\Models\SatelliteStockReceipt;
 use App\Models\Stock;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class StockApprovalService
@@ -70,7 +71,7 @@ class StockApprovalService
                 'stock_id' => $stock->id,
                 'item_id' => $stock->item_id,
                 'batch_number' => $stock->batch_number,
-                'expiry_date' => $stock->expiry_date,
+                'expiry_date' => self::normalizeDate($stock->expiry_date),
                 'qty' => $stock->qty,
                 'amount' => $stock->amount,
                 'purchase_order' => $stock->purchase_order,
@@ -123,7 +124,7 @@ class StockApprovalService
                 'batch_number'             => $entry->batch_number,
                 'qty'                      => $entry->qty,
                 'amount'                   => $entry->amount,
-                'expiry_date'              => $entry->expiry_date,
+                'expiry_date'              => self::normalizeDate($entry->expiry_date),
                 'purchase_order'           => $entry->purchase_order,
                 'supplier_id'              => $entry->supplier_id,
                 'store_id'                 => $entry->store_id,
@@ -256,5 +257,52 @@ class StockApprovalService
         }
 
         return $count;
+    }
+
+    /**
+     * Convert picker/stored dates (Y-m-d, d/m/Y, m/d/Y) to MySQL DATE format.
+     */
+    public static function normalizeDate(mixed $value): ?string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return Carbon::parse($value)->format('Y-m-d');
+        }
+
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $value)) {
+            try {
+                return Carbon::parse($value)->format('Y-m-d');
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
+        $formats = ['d/m/Y', 'd-m-Y', 'm/d/Y', 'm-d-Y', 'd.m.Y', 'Y/m/d'];
+
+        foreach ($formats as $format) {
+            try {
+                $date = Carbon::createFromFormat('!' . $format, $value);
+                if ($date && $date->format($format) === $value) {
+                    return $date->format('Y-m-d');
+                }
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+
+        try {
+            return Carbon::parse($value)->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 }

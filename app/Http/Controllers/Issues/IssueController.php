@@ -33,12 +33,16 @@ class IssueController extends Controller
         $storeIds = $this->storeContext->getScopedStoreIds();
         $decodeID = Crypt::decrypt($requisition_no);
 
-        $listrequest = ItemRequest::with(['itemcode', 'itemname.unitname', 'storename', 'staffname'])
-            ->whereIn('item_store_id', $storeIds)
+        $listrequest = ItemRequest::with(['itemcode', 'itemname.unitname', 'storename', 'staffname', 'sourceStore'])
             ->where('requisition_no', $decodeID)
-            ->where('status', 'request approved')
+            ->approvedForIssuingStores($storeIds, $this->storeContext->hasGlobalStoreAccess())
             ->orderByDesc('id')
             ->get();
+
+        if ($listrequest->isEmpty()) {
+            return redirect()->route('IssueItem')
+                ->with('message_error', 'No approved items for your store on this requisition.');
+        }
 
         $stockAvailability = [];
         foreach ($listrequest as $line) {
@@ -61,9 +65,10 @@ class IssueController extends Controller
             return back()->with('message_error', 'No items selected to issue.');
         }
 
+        $storeIds = $this->storeContext->getScopedStoreIds();
         $itemRequests = ItemRequest::with('itemname')
             ->whereIn('id', $requestIds)
-            ->where('status', 'request approved')
+            ->approvedForIssuingStores($storeIds, $this->storeContext->hasGlobalStoreAccess())
             ->get()
             ->keyBy('id');
 
@@ -222,7 +227,7 @@ class IssueController extends Controller
                                 'requisition_no'             => $itemRequest->requisition_no,
                                 'item_request_id'            => $itemRequest->id,
                                 'issue_to'                   => $itemRequest->store_id,
-                                'store_id'                   => $itemRequest->item_store_id,
+                                'store_id'                   => $receipt->store_id ?? $itemRequest->item_store_id,
                                 'created_by'                 => Auth::id(),
                                 'status'                     => 'pending',
                                 'status_two'                 => 'pending',
@@ -243,7 +248,7 @@ class IssueController extends Controller
                             'requisition_no'  => $itemRequest->requisition_no,
                             'item_request_id' => $itemRequest->id,
                             'issue_to'        => $itemRequest->store_id,
-                            'store_id'        => $itemRequest->item_store_id,
+                            'store_id'        => $stock->store_id,
                             'created_by'      => Auth::id(),
                             'status'          => 'pending',
                             'status_two'      => 'pending',
@@ -309,10 +314,21 @@ class IssueController extends Controller
         return back()->with('message_success', $message);
     }
 
+    private function issueFromStoreIds(ItemRequest $itemRequest): array
+    {
+        if ($this->storeContext->hasGlobalStoreAccess()) {
+            return [(int) $itemRequest->item_store_id];
+        }
+
+        $scoped = $this->storeContext->getScopedStoreIds();
+
+        return !empty($scoped) ? $scoped : [(int) $itemRequest->item_store_id];
+    }
+
     private function getAvailableBatches(ItemRequest $itemRequest): Collection
     {
         return ApproveStock::where('item_id', $itemRequest->item_id)
-            ->where('store_id', $itemRequest->item_store_id)
+            ->whereIn('store_id', $this->issueFromStoreIds($itemRequest))
             ->where('status', 'approved')
             ->where('qty', '>', 0)
             ->whereDate('expiry_date', '>=', now())
@@ -349,7 +365,7 @@ class IssueController extends Controller
 
         if ($this->requisitionFulfillment->usesSatelliteInventoryByStoreId((int) $itemRequest->item_store_id)) {
             $allReceipts = SatelliteStockReceipt::where('item_id', $itemRequest->item_id)
-                ->where('store_id', $itemRequest->item_store_id)
+                ->whereIn('store_id', $this->issueFromStoreIds($itemRequest))
                 ->where('qty', '>', 0)
                 ->orderBy('expiry_date', 'ASC')
                 ->get();
@@ -382,7 +398,7 @@ class IssueController extends Controller
         }
 
         $allBatches = ApproveStock::where('item_id', $itemRequest->item_id)
-            ->where('store_id', $itemRequest->item_store_id)
+            ->whereIn('store_id', $this->issueFromStoreIds($itemRequest))
             ->where('status', 'approved')
             ->where('qty', '>', 0)
             ->orderBy('expiry_date', 'ASC')

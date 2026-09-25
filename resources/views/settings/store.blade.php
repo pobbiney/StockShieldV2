@@ -469,7 +469,7 @@
     <div class="store-shell mb-4">
         <div class="store-shell-head">
             <h5><i class="bi bi-diagram-3 me-2 text-primary"></i>Requisition hub store</h5>
-            <p class="text-secondary small mb-0">Satellite stores flagged “Route to hub” send requisitions here for approval and issuing.</p>
+            <p class="text-secondary small mb-0">Satellites can request from this hub, from central stores, or from both. Tick both sources on a satellite so hub-stocked items go here and other items go to their main stores.</p>
         </div>
         <div class="store-shell-body">
             <form method="POST" action="{{ route('set-requisition-hub') }}" class="row g-3 align-items-end">
@@ -535,6 +535,25 @@
                             @error('status')<div class="field-error">{{ $message }}</div>@enderror
                         </div>
 
+                        <div class="mb-3 {{ old('store_group') === 'satellite' ? '' : 'd-none' }}" id="add_route_to_hub_wrap">
+                            <p class="small fw-semibold mb-2">Requisition sources</p>
+                            <input type="hidden" name="route_requisitions_to_hub" value="0">
+                            <input type="hidden" name="route_requisitions_to_central" value="0">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="route_requisitions_to_hub" value="1" id="add_route_requisitions_to_hub" @checked(old('route_requisitions_to_hub') == 1)>
+                                <label class="form-check-label small" for="add_route_requisitions_to_hub">
+                                    Request from Admin Store — Satellite (hub)
+                                </label>
+                            </div>
+                            <div class="form-check mt-1">
+                                <input class="form-check-input" type="checkbox" name="route_requisitions_to_central" value="1" id="add_route_requisitions_to_central" @checked(old('route_requisitions_to_central', 1) == 1)>
+                                <label class="form-check-label small" for="add_route_requisitions_to_central">
+                                    Request from central / main stores
+                                </label>
+                            </div>
+                            <p class="text-secondary small mb-0 mt-2">Shown for satellite stores. Tick both if this store requests from the hub and from main stores.</p>
+                        </div>
+
                         <div class="d-flex justify-content-end">
                             <button type="submit" class="btn-create-store">
                                 <i class="bi bi-plus-lg"></i> Add Store
@@ -586,6 +605,8 @@
                                                 {{ $store->name }}
                                                 @if($store->is_requisition_hub)
                                                     <span class="store-badge group-central ms-1"><i class="bi bi-star-fill"></i> Hub</span>
+                                                @elseif($store->requestsFromHubAndCentral())
+                                                    <span class="store-badge group-satellite ms-1"><i class="bi bi-signpost-split"></i> Hub + Central</span>
                                                 @elseif($store->route_requisitions_to_hub)
                                                     <span class="store-badge group-satellite ms-1"><i class="bi bi-signpost-split"></i> Routes to hub</span>
                                                 @endif
@@ -613,6 +634,7 @@
                                                     data-status="{{ $store->status }}"
                                                     data-group="{{ $store->store_group ?? '' }}"
                                                     data-route-hub="{{ $store->route_requisitions_to_hub ? '1' : '0' }}"
+                                                    data-route-central="{{ $store->routesRequisitionsToCentral() ? '1' : '0' }}"
                                                     data-is-hub="{{ $store->is_requisition_hub ? '1' : '0' }}">
                                                     <i class="bi bi-pencil-fill"></i>
                                                 </button>
@@ -676,12 +698,15 @@ document.addEventListener('click', function (e) {
     document.getElementById('edit_store_group').value = btn.dataset.group || '';
 
     const routeCheckbox = document.getElementById('edit_route_requisitions_to_hub');
+    const centralCheckbox = document.getElementById('edit_route_requisitions_to_central');
     const routeWrap = document.getElementById('edit_route_to_hub_wrap');
     const isHub = btn.dataset.isHub === '1';
     const isSatellite = btn.dataset.group === 'satellite';
 
     routeCheckbox.checked = btn.dataset.routeHub === '1';
+    centralCheckbox.checked = btn.dataset.routeCentral === '1';
     routeCheckbox.disabled = !isSatellite || isHub;
+    centralCheckbox.disabled = !isSatellite || isHub;
     routeWrap.classList.toggle('d-none', !isSatellite || isHub);
 
     const modalEl = document.getElementById('editStoreModal');
@@ -690,15 +715,39 @@ document.addEventListener('click', function (e) {
 
 document.getElementById('edit_store_group')?.addEventListener('change', function () {
     const routeCheckbox = document.getElementById('edit_route_requisitions_to_hub');
+    const centralCheckbox = document.getElementById('edit_route_requisitions_to_central');
     const routeWrap = document.getElementById('edit_route_to_hub_wrap');
     const isSatellite = this.value === 'satellite';
     routeWrap.classList.toggle('d-none', !isSatellite);
     if (!isSatellite) {
         routeCheckbox.checked = false;
+        centralCheckbox.checked = true;
         routeCheckbox.disabled = true;
+        centralCheckbox.disabled = true;
     } else {
         routeCheckbox.disabled = false;
+        centralCheckbox.disabled = false;
+        if (!routeCheckbox.checked && !centralCheckbox.checked) {
+            centralCheckbox.checked = true;
+        }
     }
 });
+
+function syncAddStoreRouting() {
+    const group = document.getElementById('store_group');
+    const wrap = document.getElementById('add_route_to_hub_wrap');
+    const hubBox = document.getElementById('add_route_requisitions_to_hub');
+    const centralBox = document.getElementById('add_route_requisitions_to_central');
+    if (!group || !wrap) return;
+    const isSatellite = group.value === 'satellite';
+    wrap.classList.toggle('d-none', !isSatellite);
+    if (!isSatellite) {
+        if (hubBox) hubBox.checked = false;
+        if (centralBox) centralBox.checked = true;
+    }
+}
+
+document.getElementById('store_group')?.addEventListener('change', syncAddStoreRouting);
+syncAddStoreRouting();
 </script>
 @endsection

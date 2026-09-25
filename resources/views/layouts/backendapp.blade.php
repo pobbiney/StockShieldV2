@@ -712,9 +712,14 @@
             z-index: 99999;
             display: flex;
             flex-direction: column;
-            gap: 0.75rem;
+            align-items: stretch;
+            gap: 0;
             max-width: min(380px, calc(100vw - 2rem));
             pointer-events: none;
+        }
+
+        .ss-toast-stack > .ss-toast:not(:first-of-type) {
+            display: none !important;
         }
 
         .ss-toast {
@@ -856,6 +861,84 @@
 
         .ss-toast-persistent {
             border-left: 3px solid #25d366;
+        }
+
+        .ss-toast-pill {
+            position: fixed;
+            right: 1.25rem;
+            bottom: 1.25rem;
+            z-index: 99998;
+            pointer-events: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            max-width: min(320px, calc(100vw - 2rem));
+            padding: 0.42rem 0.9rem 0.42rem 0.48rem;
+            border: none;
+            border-radius: 2rem;
+            background: #075e54;
+            color: #fff;
+            box-shadow: 0 6px 20px rgba(7, 94, 84, 0.35);
+            cursor: pointer;
+            animation: ssToastPillPulse 1.6s ease-in-out infinite;
+        }
+
+        .ss-toast-pill.d-none {
+            display: none !important;
+            animation: none;
+        }
+
+        .ss-toast-pill-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #25d366;
+            box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7);
+            animation: ssToastPillDot 1.6s ease-out infinite;
+            flex-shrink: 0;
+        }
+
+        .ss-toast-pill-count {
+            min-width: 1.35rem;
+            height: 1.35rem;
+            padding: 0 0.3rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.18);
+            font-size: 0.72rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .ss-toast-pill-title {
+            font-size: 0.78rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 14rem;
+            text-align: left;
+        }
+
+        @keyframes ssToastPillPulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+                box-shadow: 0 6px 20px rgba(7, 94, 84, 0.35);
+            }
+            50% {
+                opacity: 0.78;
+                transform: scale(1.03);
+                box-shadow: 0 0 0 8px rgba(37, 211, 102, 0.18);
+            }
+        }
+
+        @keyframes ssToastPillDot {
+            0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7); }
+            70% { box-shadow: 0 0 0 8px rgba(37, 211, 102, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
         }
 
         /* DataTables — ensure white backgrounds app-wide */
@@ -1204,6 +1287,11 @@
                 </div>
 
                 <div id="ss-toast-stack" class="ss-toast-stack" aria-live="polite" aria-atomic="false"></div>
+                <button type="button" id="ss-toast-pill" class="ss-toast-pill d-none" aria-live="polite" aria-hidden="true">
+                    <span class="ss-toast-pill-dot" aria-hidden="true"></span>
+                    <span class="ss-toast-pill-count">0</span>
+                    <span class="ss-toast-pill-title">Notifications</span>
+                </button>
 
                 <!-- notification -->
                 <div class="offcanvas offcanvas-end shadow border-0 maxwidth-300" tabindex="-1" id="view-notification" data-bs-scroll="true" data-bs-backdrop="false">
@@ -1626,6 +1714,7 @@ Swal.fire({
         JSON.parse(sessionStorage.getItem(dismissedToastKey) || '[]')
     );
     const TOAST_AUTO_HIDE_MS = 10000;
+    let latestUnreadNotes = [];
 
     function escapeHtml(text) {
         const div = document.createElement('div');
@@ -1683,6 +1772,48 @@ Swal.fire({
         }
     }
 
+    function rememberUnreadNotes(notifications) {
+        latestUnreadNotes = (notifications || []).filter(function (note) {
+            return note && note.is_unread;
+        }).sort(function (a, b) {
+            return Number(b.id) - Number(a.id);
+        });
+    }
+
+    function hasLiveToast() {
+        return !!document.querySelector('#ss-toast-stack .ss-toast:not(.ss-toast-exit)');
+    }
+
+    function updateToastPill() {
+        const pill = document.getElementById('ss-toast-pill');
+        if (!pill) {
+            return;
+        }
+
+        const count = latestUnreadNotes.length;
+        const countEl = pill.querySelector('.ss-toast-pill-count');
+        const titleEl = pill.querySelector('.ss-toast-pill-title');
+
+        if (count === 0 || hasLiveToast()) {
+            pill.classList.add('d-none');
+            pill.setAttribute('aria-hidden', 'true');
+            return;
+        }
+
+        const latest = latestUnreadNotes[0];
+        if (countEl) {
+            countEl.textContent = count > 99 ? '99+' : String(count);
+        }
+        if (titleEl) {
+            titleEl.textContent = (latest && latest.title)
+                ? latest.title
+                : (count === 1 ? '1 notification' : count + ' notifications');
+        }
+
+        pill.classList.remove('d-none');
+        pill.setAttribute('aria-hidden', 'false');
+    }
+
     function persistDismissedToasts() {
         sessionStorage.setItem(dismissedToastKey, JSON.stringify(Array.from(dismissedToastIds)));
     }
@@ -1727,7 +1858,10 @@ Swal.fire({
         }
 
         toast.classList.add('ss-toast-exit');
-        setTimeout(function () { toast.remove(); }, 260);
+        setTimeout(function () {
+            toast.remove();
+            updateToastPill();
+        }, 260);
     }
 
     function removeToastById(id) {
@@ -1742,11 +1876,17 @@ Swal.fire({
         }
 
         const notifId = String(note.id);
-        if (document.querySelector('.ss-toast[data-notif-id="' + notifId + '"]')) {
+        if (dismissedToastIds.has(notifId)) {
             return false;
         }
 
-        if (dismissedToastIds.has(notifId)) {
+        document.querySelectorAll('#ss-toast-stack .ss-toast').forEach(function (existing) {
+            if (existing.dataset.notifId !== notifId) {
+                dismissToast(existing, true);
+            }
+        });
+
+        if (document.querySelector('.ss-toast[data-notif-id="' + notifId + '"]')) {
             return false;
         }
 
@@ -1790,6 +1930,7 @@ Swal.fire({
         });
 
         stack.prepend(toast);
+        updateToastPill();
         scheduleToastAutoHide(toast);
 
         if (playSound) {
@@ -1800,10 +1941,8 @@ Swal.fire({
     }
 
     function syncUnreadToasts(notifications) {
-        const unread = (notifications || []).filter(function (note) {
-            return note.is_unread;
-        });
-        const unreadIds = new Set(unread.map(function (note) {
+        rememberUnreadNotes(notifications);
+        const unreadIds = new Set(latestUnreadNotes.map(function (note) {
             return String(note.id);
         }));
 
@@ -1819,10 +1958,7 @@ Swal.fire({
             }
         });
         persistDismissedToasts();
-
-        unread.forEach(function (note) {
-            showPersistentToast(note, false);
-        });
+        updateToastPill();
     }
 
     function showNativeNotification(note) {
@@ -1950,9 +2086,17 @@ Swal.fire({
             data: { last_id: lastSeenId },
             success: function (response) {
                 if (response.count > 0) {
-                    response.notifications.forEach(function (note) {
-                        notifyUser(note, true);
+                    const notes = response.notifications || [];
+                    const newest = notes[notes.length - 1];
+                    notes.forEach(function (note) {
+                        if (newest && String(note.id) !== String(newest.id)) {
+                            dismissedToastIds.add(String(note.id));
+                        }
                     });
+                    persistDismissedToasts();
+                    if (newest) {
+                        notifyUser(newest, true);
+                    }
                 }
 
                 syncUnreadToasts(response.unread_notifications || []);
@@ -1994,6 +2138,8 @@ Swal.fire({
                 });
                 dismissedToastIds.clear();
                 persistDismissedToasts();
+                latestUnreadNotes = [];
+                updateToastPill();
                 loadActionNotifications();
             }
         });
@@ -2005,6 +2151,10 @@ Swal.fire({
         Notification.requestPermission().then(function () {
             refreshDesktopPermissionBanner();
         });
+    });
+
+    document.getElementById('ss-toast-pill')?.addEventListener('click', function () {
+        openNotificationsPanel();
     });
 
     $('#notificationBellBtn').on('click', function () {

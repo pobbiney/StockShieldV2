@@ -33,13 +33,22 @@
                         @error('status')<div class="field-error">{{ $message }}</div>@enderror
                     </div>
                     <div class="mb-0" id="edit_route_to_hub_wrap">
+                        <p class="small fw-semibold mb-2">Requisition sources</p>
+                        <input type="hidden" name="route_requisitions_to_hub" value="0">
+                        <input type="hidden" name="route_requisitions_to_central" value="0">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" name="route_requisitions_to_hub" value="1" id="edit_route_requisitions_to_hub">
                             <label class="form-check-label small" for="edit_route_requisitions_to_hub">
-                                Route requisitions to hub store
+                                Request from Admin Store — Satellite (hub)
                             </label>
                         </div>
-                        <p class="text-secondary small mb-0 mt-1">When enabled, this satellite store sends requisitions to the configured requisition hub instead of central stores.</p>
+                        <div class="form-check mt-1">
+                            <input class="form-check-input" type="checkbox" name="route_requisitions_to_central" value="1" id="edit_route_requisitions_to_central">
+                            <label class="form-check-label small" for="edit_route_requisitions_to_central">
+                                Request from central / main stores
+                            </label>
+                        </div>
+                        <p class="text-secondary small mb-0 mt-2">Tick both to split each line by where stock lives: items the hub holds go to Admin Store — Satellite; items only in General Store and other main stores go to those stores.</p>
                     </div>
                 </div>
                 <div class="store-modal-footer d-flex justify-content-end gap-2">

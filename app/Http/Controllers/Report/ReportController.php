@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Report;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ItemIssue;
+use App\Models\SatelliteItemIssue;
 use App\Models\Stock;
 use App\Models\Store;
 use Illuminate\Http\Request;
@@ -481,6 +482,40 @@ public function searchStockLevelReport(Request $request)
         return view('report.IssuedItemsReport',['liststores'=>$liststores]);
     }
 
+    protected function storeIssuesFromSatelliteInventory(?Store $store): bool
+    {
+        return $store && ($store->isAdminStoreSatellite() || $store->isRequisitionHub());
+    }
+
+    protected function issuedItemsForStore(
+        int $storeId,
+        string $orderBy = 'id',
+        string $direction = 'desc',
+        array $filters = []
+    ) {
+        $store = Store::find($storeId);
+        $relations = ['itemname.unitname', 'issuefrom', 'storename', 'staffname'];
+
+        $query = $this->storeIssuesFromSatelliteInventory($store)
+            ? SatelliteItemIssue::with($relations)
+            : ItemIssue::with($relations);
+
+        $query->where('store_id', $storeId)->where('status', 'issued');
+
+        if (! empty($filters['item_id'])) {
+            $query->where('item_id', $filters['item_id']);
+        }
+
+        if (! empty($filters['start_date']) && ! empty($filters['end_date'])) {
+            $query->whereBetween('created_at', [
+                $filters['start_date'] . ' 00:00:00',
+                $filters['end_date'] . ' 23:59:59',
+            ]);
+        }
+
+        return $query->orderBy($orderBy, $direction)->get();
+    }
+
      public function searchIssuedStoreReport(Request $request)
     {
           
@@ -496,14 +531,7 @@ public function searchStockLevelReport(Request $request)
          $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
          $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()
 
-       $liststock = ItemIssue::where('store_id', $request->department)
-      
-    ->where(function($query) {
-        $query->where('status', 'issued');
-            
-    })
-    ->orderBy('id', 'DESC')
-    ->get();
+       $liststock = $this->issuedItemsForStore((int) $request->department, 'id', 'desc');
         if ($liststock->count() > 0) {
 
             return view(
@@ -537,14 +565,7 @@ public function searchStockLevelReport(Request $request)
          $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
          $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()R
 
-       $liststock = ItemIssue::where('store_id', $request->department)
-      
-    ->where(function($query) {
-        $query->where('status', 'issued');
-            
-    })
-    ->orderBy('invoice_number')
-    ->get();
+       $liststock = $this->issuedItemsForStore((int) $request->department, 'invoice_number', 'asc');
     $store = Store::find($request->department);
         return view(
         'report.printIssuedItemReport',
@@ -582,14 +603,9 @@ public function searchStockLevelReport(Request $request)
          $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
          $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()
 
-       $liststock = ItemIssue::where('store_id', $request->department)
-       ->where('item_id',$request->item)
-    ->where(function($query) {
-        $query->where('status', 'issued');
-              
-    })
-    ->orderBy('invoice_number')
-    ->get();
+       $liststock = $this->issuedItemsForStore((int) $request->department, 'invoice_number', 'asc', [
+           'item_id' => $request->item,
+       ]);
         if ($liststock->count() > 0) {
 
             return view(
@@ -623,14 +639,9 @@ public function searchStockLevelReport(Request $request)
          $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
          $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()
 
-       $liststock = ItemIssue::where('store_id', $request->department)
-       ->where('item_id',$request->item)
-    ->where(function($query) {
-        $query->where('status', 'issued');
-              
-    })
-    ->orderBy('invoice_number')
-    ->get();
+       $liststock = $this->issuedItemsForStore((int) $request->department, 'invoice_number', 'asc', [
+           'item_id' => $request->item,
+       ]);
      $store = Store::find($request->department);
       return view(
         'report.printIssuedByItemReport',
@@ -659,17 +670,10 @@ public function searchStockLevelReport(Request $request)
         // All stores
         $liststores = Store::all();
 
-       $liststock = ItemIssue::where('store_id', $request->department)
-    ->where(function($query) {
-        $query->where('status', 'issued');
-            
-    }) ->whereBetween('created_at', [
-            $request->start_date . ' 00:00:00',
-            $request->end_date . ' 23:59:59'
-        ])
- 
-    ->orderBy('id', 'DESC')
-    ->get();
+       $liststock = $this->issuedItemsForStore((int) $request->department, 'id', 'desc', [
+           'start_date' => $request->start_date,
+           'end_date' => $request->end_date,
+       ]);
         if ($liststock->count() > 0) {
 
             return view(
@@ -703,17 +707,10 @@ public function searchStockLevelReport(Request $request)
            $startDate = $request->start_date;
           $endDate   = $request->end_date;
 
-       $liststock = ItemIssue::where('store_id', $request->department)
-    ->where(function($query) {
-        $query->where('status', 'issued');
-            
-    }) ->whereBetween('created_at', [
-            $request->start_date . ' 00:00:00',
-            $request->end_date . ' 23:59:59'
-        ])
- 
-    ->orderBy('id', 'DESC')
-    ->get();
+       $liststock = $this->issuedItemsForStore((int) $request->department, 'id', 'desc', [
+           'start_date' => $request->start_date,
+           'end_date' => $request->end_date,
+       ]);
         $store = Store::find($request->department);
 
     return view(
@@ -740,6 +737,7 @@ public function searchStockLevelReport(Request $request)
         'start_date' => 'required|date',
         'end_date' => 'required|date',
         'item' => 'required',
+        'department' => 'required',
     ]);
 
        
@@ -747,17 +745,11 @@ public function searchStockLevelReport(Request $request)
         $liststores = Store::all();
          $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
          $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()
-       $liststock = ItemIssue::where('item_id', $request->item)
-    ->where(function($query) {
-        $query->where('status', 'issued');
-              
-    }) ->whereBetween('created_at', [
-            $request->start_date . ' 00:00:00',
-            $request->end_date . ' 23:59:59'
-        ])
- 
-    ->orderBy('id', 'DESC')
-    ->get();
+       $liststock = $this->issuedItemsForStore((int) $request->department, 'id', 'desc', [
+           'item_id' => $request->item,
+           'start_date' => $request->start_date,
+           'end_date' => $request->end_date,
+       ]);
         if ($liststock->count() > 0) {
 
             return view(
@@ -793,18 +785,12 @@ public function searchStockLevelReport(Request $request)
 
          $listdept = array_map('intval', explode('~', Auth::user()->department_id)); // cast to int
          $getItemid = Item::whereIn('store_id', $listdept)->get(); // fix: whereIn + get()
-       $liststock = ItemIssue::where('item_id', $request->item)
-    ->where(function($query) {
-        $query->where('status', 'issued');
-              
-    }) ->whereBetween('created_at', [
-            $request->start_date . ' 00:00:00',
-            $request->end_date . ' 23:59:59'
-        ])
- 
-    ->orderBy('id', 'DESC')
-    ->get();
-       $store = Store::find(Auth::user()->department_id);
+       $liststock = $this->issuedItemsForStore((int) $request->department, 'id', 'desc', [
+           'item_id' => $request->item,
+           'start_date' => $request->start_date,
+           'end_date' => $request->end_date,
+       ]);
+       $store = Store::find($request->department);
 
     return view(
         'report.printIssuedItemByDateInterval',

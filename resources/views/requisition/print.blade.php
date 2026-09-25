@@ -516,7 +516,7 @@ tfoot td {
       </div>
       <div class="info-row">
         <span class="info-key">Issued By:</span>
-        <span class="info-val">{{ $issues->staffname->name }}</span>
+        <span class="info-val">{{ optional($issues->staffname)->name ?? '—' }}</span>
       </div>
       
       <div class="info-row">
@@ -531,8 +531,12 @@ tfoot td {
         <span class="info-val">{{  $issueto->name}}</span>
       </div>
       <div class="info-row">
+        <span class="info-key">Requested By:</span>
+        <span class="info-val">{{ $requestedBy ?? '—' }}</span>
+      </div>
+      <div class="info-row">
         <span class="info-key">Approved By:</span>
-        <span class="info-val">{{ $issues->authorised->name  }}</span>
+        <span class="info-val">{{ optional($issues->authorised)->name ?? '—' }}</span>
       </div>
       <div class="info-row">
         <span class="info-key">Approved On:</span>

@@ -66,13 +66,23 @@ $backUrl = route('IssuedItemsReport');
                 <td><b>{{ number_format($lineTotal, 2) }}</b></td>
             </tr>
             @endforeach
-            <tr>
-                <td colspan="9"><b style="float: right">TOTAL</b></td>
-                <td><b>{{ $totalqty }}</b></td>
-                <td><b></b></td>
-                <td><b>{{ number_format($grandTotal, 2) }}</b></td>
-            </tr>
         </tbody>
+        <tfoot>
+            <tr>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th class="text-end">TOTAL</th>
+                <th>{{ $totalqty }}</th>
+                <th></th>
+                <th>{{ number_format($grandTotal, 2) }}</th>
+            </tr>
+        </tfoot>
     </table>
 </div>
 @endsection

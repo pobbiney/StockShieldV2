@@ -21,6 +21,7 @@ $backUrl = route('IssuedItemsReport');
     @csrf
     <div class="rp-filter-grid">
         @include('report.partials.date-range')
+        @include('report.partials.store-select')
         <div>
             <label class="form-label">Item</label>
             <select class="js-example-basic-single form-select" name="item">
@@ -40,7 +41,7 @@ $backUrl = route('IssuedItemsReport');
 
 @if(isset($liststock) && $liststock->count() > 0)
 @section('results-actions')
-<a href="{{ route('report.issued-item-byitemDate-print', ['item' => request()->item, 'start_date' => request()->start_date, 'end_date' => request()->end_date]) }}" target="_blank" class="btn-rp-print"><i class="bi bi-printer"></i> Print</a>
+<a href="{{ route('report.issued-item-byitemDate-print', ['department' => request()->department, 'item' => request()->item, 'start_date' => request()->start_date, 'end_date' => request()->end_date]) }}" target="_blank" class="btn-rp-print"><i class="bi bi-printer"></i> Print</a>
 @endsection
 
 @section('results')
@@ -85,13 +86,23 @@ $backUrl = route('IssuedItemsReport');
                 <td><b>{{ number_format($lineTotal, 2) }}</b></td>
             </tr>
             @endforeach
-            <tr>
-                <td colspan="9"><b style="float: right">TOTAL</b></td>
-                <td><b>{{ $totalqty }}</b></td>
-                <td><b></b></td>
-                <td><b>{{ number_format($grandTotal, 2) }}</b></td>
-            </tr>
         </tbody>
+        <tfoot>
+            <tr>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th class="text-end">TOTAL</th>
+                <th>{{ $totalqty }}</th>
+                <th></th>
+                <th>{{ number_format($grandTotal, 2) }}</th>
+            </tr>
+        </tfoot>
     </table>
 </div>
 @endsection
