@@ -103,6 +103,73 @@
         box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
     }
 
+    .unit-modal .modal-content {
+        border-radius: 1.25rem;
+        border: none;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+    }
+
+    .unit-modal .modal-header {
+        background: linear-gradient(135deg, #92400e 0%, #d97706 100%);
+        color: #fff;
+        border: none;
+        padding: 1.25rem 1.5rem;
+    }
+
+    .unit-modal .modal-header .modal-title {
+        font-family: "SUSE", sans-serif;
+        font-weight: 700;
+        font-size: 1.05rem;
+    }
+
+    .unit-modal .modal-header .btn-close {
+        filter: invert(1) grayscale(1) brightness(2);
+    }
+
+    .unit-modal .modal-body { padding: 1.35rem 1.5rem; }
+
+    .unit-modal .modal-footer {
+        border-top: 1px solid #f1f5f9;
+        padding: 1rem 1.5rem;
+        background: #f8fafc;
+        gap: 0.5rem;
+    }
+
+    .unit-modal .form-label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #64748b;
+        margin-bottom: 0.35rem;
+    }
+
+    .unit-modal .form-control {
+        border-radius: 0.75rem;
+        border: 1.5px solid #e2e8f0;
+        font-size: 0.9rem;
+        height: 44px;
+    }
+
+    .unit-modal .form-control:focus {
+        border-color: #d97706;
+        box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+    }
+
+    .btn-modal-continue {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.55rem 1.15rem;
+        border-radius: 0.625rem;
+        border: none;
+        background: #d97706;
+        color: #fff;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .btn-modal-continue:hover { background: #b45309; color: #fff; }
+
     .avail-badge {
         display: inline-block;
         padding: 0.15rem 0.5rem;
@@ -190,6 +257,7 @@
             </div>
             <form method="POST" action="{{ route('issue-request-process') }}" id="issueForm">
                 @csrf
+                <input type="hidden" name="requisition_unit" id="requisitionUnitHidden" value="{{ old('requisition_unit') }}">
                 <div class="table-responsive">
                     <table class="table mb-0" id="vsrTable">
                         <thead>
@@ -222,12 +290,14 @@
                                     $noStock = $avail['expired_only'] || $avail['available_qty'] <= 0;
                                     $maxIssue = $noStock ? 0 : min($approvedQty, $avail['available_qty']);
                                     $availClass = $avail['expired_only'] ? 'expired' : ($avail['available_qty'] <= 0 ? 'none' : ($avail['available_qty'] < $approvedQty ? 'low' : 'ok'));
+                                    $usesSatellite = !empty($usesSatelliteByLine[$lists->id]);
                                 @endphp
                                 <tr data-request-id="{{ $lists->id }}"
                                     data-approved="{{ $approvedQty }}"
                                     data-available="{{ $avail['available_qty'] }}"
                                     data-no-stock="{{ $noStock ? '1' : '0' }}"
                                     data-expired-only="{{ $avail['expired_only'] ? '1' : '0' }}"
+                                    data-uses-satellite="{{ $usesSatellite ? '1' : '0' }}"
                                     data-item-name="{{ $lists->itemname->name ?? 'Item' }}">
                                     <td>
                                         {{ $loop->iteration }}
@@ -237,7 +307,6 @@
                                     <td class="fw-semibold">{{ $lists->itemname->name ?? '—' }}</td>
                                     <td>
                                         @php
-                                            $usesSatellite = !empty($usesSatelliteByLine[$lists->id]);
                                             $itemUnitId = old('unit_id.'.$lists->id, optional($lists->itemname)->unit_id);
                                         @endphp
                                         @if($usesSatellite)
@@ -341,6 +410,37 @@
 
 @include('stock.reject-request-modal')
 
+<div class="modal fade unit-modal" id="requisitionUnitModal" tabindex="-1" aria-labelledby="requisitionUnitModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title d-flex align-items-center gap-2" id="requisitionUnitModalLabel">
+                    <i class="bi bi-rulers"></i> Unit from requisition
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">
+                    Enter the unit this requisition is coming from. It will be applied to all satellite items on this issue.
+                </p>
+                <label for="requisitionUnitInput" class="form-label">Unit</label>
+                <input type="text"
+                       id="requisitionUnitInput"
+                       class="form-control"
+                       maxlength="100"
+                       placeholder="Unit from requisition"
+                       autocomplete="off">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-modal-clear" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-modal-continue" id="requisitionUnitContinue">
+                    Continue
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @section('scripts')
@@ -435,6 +535,7 @@ $(document).ready(function () {
         var errors = [];
         var hasPositiveQty = false;
         var hasNoStockLine = false;
+        var hasSatelliteQty = false;
 
         $('#vsrTable tbody tr[data-request-id]').each(function () {
             var row = $(this);
@@ -443,6 +544,7 @@ $(document).ready(function () {
             var available = parseInt(row.data('available'), 10) || 0;
             var noStock = row.data('no-stock') === 1 || row.data('no-stock') === '1';
             var expiredOnly = row.data('expired-only') === 1 || row.data('expired-only') === '1';
+            var usesSatellite = row.data('uses-satellite') === 1 || row.data('uses-satellite') === '1';
             var input = row.find('.qty-to-issue');
 
             if (noStock) {
@@ -470,6 +572,9 @@ $(document).ready(function () {
             }
 
             hasPositiveQty = true;
+            if (usesSatellite) {
+                hasSatelliteQty = true;
+            }
 
             if (expiredOnly) {
                 errors.push(itemName + ': all stock batches have expired.');
@@ -500,9 +605,51 @@ $(document).ready(function () {
             return;
         }
 
-        IssueAlert.confirmIssue(function () {
-            form.submit();
-        });
+        var submitIssue = function () {
+            IssueAlert.confirmIssue(function () {
+                form.submit();
+            });
+        };
+
+        if (hasSatelliteQty) {
+            var unitModalEl = document.getElementById('requisitionUnitModal');
+            var unitModal = bootstrap.Modal.getOrCreateInstance(unitModalEl);
+            $('#requisitionUnitInput').val($('#requisitionUnitHidden').val() || '');
+            unitModal.show();
+            unitModalEl.addEventListener('shown.bs.modal', function () {
+                $('#requisitionUnitInput').trigger('focus');
+            }, { once: true });
+            return;
+        }
+
+        submitIssue();
+    });
+
+    $('#requisitionUnitContinue').on('click', function () {
+        var unit = $.trim($('#requisitionUnitInput').val() || '');
+        $('#requisitionUnitHidden').val(unit);
+        var unitModalEl = document.getElementById('requisitionUnitModal');
+        var unitModal = bootstrap.Modal.getInstance(unitModalEl);
+        var showConfirm = function () {
+            IssueAlert.confirmIssue(function () {
+                $('#issueForm').submit();
+            });
+        };
+
+        if (unitModal && $(unitModalEl).hasClass('show')) {
+            $(unitModalEl).one('hidden.bs.modal', showConfirm);
+            unitModal.hide();
+            return;
+        }
+
+        showConfirm();
+    });
+
+    $('#requisitionUnitInput').on('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            $('#requisitionUnitContinue').trigger('click');
+        }
     });
 
     $('.qty-to-issue').on('input', function () {

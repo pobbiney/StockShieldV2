@@ -501,6 +501,7 @@
                         <tr>
                             <th>#</th>
                             <th>Store</th>
+                            <th>Date of Entry</th>
                             <th>Pending</th>
                             <th>Total Qty</th>
                             <th>Avg. Item Price</th>
@@ -522,6 +523,14 @@
                                             </div>
                                         </div>
                                     </div>
+                                </td>
+                                <td>
+                                    @if($store->latest_entry_at)
+                                        {{ \Carbon\Carbon::parse($store->latest_entry_at)->format('M d, Y') }}
+                                        <div class="store-sub">{{ \Carbon\Carbon::parse($store->latest_entry_at)->format('h:i A') }}</div>
+                                    @else
+                                        —
+                                    @endif
                                 </td>
                                 <td>
                                     <span class="count-badge">

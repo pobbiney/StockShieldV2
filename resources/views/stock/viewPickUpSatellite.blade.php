@@ -188,6 +188,14 @@
         color: #475569;
     }
 
+    .uom-from-req {
+        display: block;
+        margin-top: 0.2rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #64748b;
+    }
+
     .qty-badge {
         display: inline-flex;
         align-items: center;
@@ -436,7 +444,12 @@
                             <td class="text-secondary">{{ $loop->iteration }}</td>
                             <td><code>{{ optional($lists->itemcode)->item_code ?? '—' }}</code></td>
                             <td class="fw-semibold">{{ optional($lists->itemname)->name ?? '—' }}</td>
-                            <td>{{ optional($lists->unitname)->name ?? optional(optional($lists->itemname)->unitname)->name ?? '—' }}</td>
+                            <td>
+                                {{ optional($lists->unitname)->name ?? optional(optional($lists->itemname)->unitname)->name ?? '—' }}
+                                @if(!empty($lists->requisition_unit))
+                                    <div class="uom-from-req">From req: {{ $lists->requisition_unit }}</div>
+                                @endif
+                            </td>
                             <td><span class="batch-code">{{ $lists->batch_number ?: '—' }}</span></td>
                             @if($isWardIssue)
                                 <td>{{ $lists->destinationLabel() }}</td>

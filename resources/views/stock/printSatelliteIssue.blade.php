@@ -213,6 +213,14 @@
     vertical-align: middle;
   }
 
+  .uom-from-req {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-mute);
+  }
+
   tbody td:first-child { padding-left: 10px; }
   tbody td:last-child { padding-right: 10px; }
 
@@ -435,7 +443,12 @@
             <td>{{ $loop->iteration }}</td>
             <td>{{ optional($line->itemcode)->item_code ?? '—' }}</td>
             <td>{{ optional($line->itemname)->name ?? '—' }}</td>
-            <td>{{ optional($line->unitname)->name ?? optional(optional($line->itemname)->unitname)->name ?? '—' }}</td>
+            <td>
+              {{ optional($line->unitname)->name ?? optional(optional($line->itemname)->unitname)->name ?? '—' }}
+              @if(!empty($line->requisition_unit))
+                <span class="uom-from-req">From req: {{ $line->requisition_unit }}</span>
+              @endif
+            </td>
             <td>{{ $line->batch_number ?? '—' }}</td>
             <td>{{ $line->qty_issued }}</td>
           </tr>

@@ -11,6 +11,7 @@ class SatelliteItemIssue extends Model
         'stock_id',
         'item_id',
         'unit_id',
+        'requisition_unit',
         'batch_number',
         'qty',
         'qty_requested',

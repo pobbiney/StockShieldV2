@@ -124,7 +124,24 @@ class RequisitionController extends Controller
             'unique_items'    => $lines->pluck('item_id')->unique()->count(),
             'total_qty'       => (int) $lines->sum('qty'),
             'issued_at'       => $lines->max('updated_at'),
+            'requisition_unit'=> $this->pickListRequisitionUnit($lines),
         ];
+    }
+
+    protected function pickListRequisitionUnit($lines): ?string
+    {
+        $units = collect($lines)
+            ->pluck('requisition_unit')
+            ->map(fn ($unit) => is_string($unit) ? trim($unit) : '')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($units->isEmpty()) {
+            return null;
+        }
+
+        return $units->join(', ');
     }
 
     protected function satellitePickListRows(array $storeIds)
@@ -206,6 +223,7 @@ class RequisitionController extends Controller
                     'unique_items'    => $lines->pluck('item_id')->unique()->count(),
                     'total_qty'       => (int) $lines->sum('qty_issued'),
                     'issued_at'       => $lines->max('issued_at'),
+                    'requisition_unit'=> $this->pickListRequisitionUnit($lines),
                 ];
             });
 
@@ -240,6 +258,7 @@ class RequisitionController extends Controller
                     'unique_items'    => $lines->pluck('item_id')->unique()->count(),
                     'total_qty'       => (int) $lines->sum('qty'),
                     'issued_at'       => $lines->max('updated_at'),
+                    'requisition_unit'=> $this->pickListRequisitionUnit($lines),
                 ];
             });
 
@@ -255,7 +274,7 @@ class RequisitionController extends Controller
         return $wardIssues
             ->concat($centralTransfers)
             ->concat($outboundSatelliteIssues)
-            ->sortByDesc(fn ($group) => $group->issued_at)
+            ->sortByDesc(fn ($group) => optional($group->issued_at)?->timestamp ?? 0)
             ->values();
     }
 
@@ -660,7 +679,7 @@ class RequisitionController extends Controller
 
         $listrequest = $listrequest
             ->concat($satelliteRows)
-            ->sortByDesc(fn ($row) => $row->updated_at)
+            ->sortByDesc(fn ($row) => optional($row->issued_at ?? $row->updated_at)?->timestamp ?? 0)
             ->values();
 
         return view('requisition.PickList', [

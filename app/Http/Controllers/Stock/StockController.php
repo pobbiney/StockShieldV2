@@ -977,6 +977,7 @@ class StockController extends Controller
             $store->pending_avg_price = $store->pending_qty > 0
                 ? round($store->pending_value / $store->pending_qty, 2)
                 : 0;
+            $store->latest_entry_at = $rows->max('created_at');
 
             return $store;
         });

@@ -344,7 +344,9 @@
                             <th>#</th>
                             <th>Type</th>
                             <th>Reference No</th>
+                            <th>Invoice</th>
                             <th>Ward / Store</th>
+                            <th>Unit</th>
                             <th>Items</th>
                             <th>Qty</th>
                             <th>Issued</th>
@@ -367,6 +369,13 @@
                                 </td>
                                 <td><span class="req-no-badge">{{ $pick->reference_no }}</span></td>
                                 <td>
+                                    @if(!empty($pick->invoice_number))
+                                        <code class="small">{{ $pick->invoice_number }}</code>
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                                <td>
                                     @if(($pick->pick_type ?? '') === 'ward_issue')
                                         <span class="store-badge">
                                             <i class="bi bi-hospital"></i>
@@ -384,9 +393,16 @@
                                         </span>
                                     @endif
                                 </td>
+                                <td>
+                                    @if(!empty($pick->requisition_unit))
+                                        <span class="store-badge">{{ $pick->requisition_unit }}</span>
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
                                 <td>{{ $pick->unique_items }} item{{ $pick->unique_items !== 1 ? 's' : '' }} ({{ $pick->line_count }} lines)</td>
                                 <td><span class="qty-badge">{{ number_format($pick->total_qty) }}</span></td>
-                                <td>
+                                <td data-order="{{ optional($pick->issued_at)->format('Y-m-d H:i:s') ?? '' }}">
                                     {{ $pick->issued_at?->format('M d, Y') ?? '—' }}
                                     <div class="text-muted small">{{ $pick->issued_at?->format('h:i A') }}</div>
                                 </td>
@@ -441,11 +457,14 @@
 $(document).ready(function () {
     if ($('#pickListTable').length && $.fn.DataTable && $('#pickListTable tbody tr').length) {
         $('#pickListTable').DataTable({
-            order: [[6, 'desc']],
+            order: [[8, 'desc']],
             pageLength: 15,
             lengthMenu: [[10, 15, 25, 50, -1], [10, 15, 25, 50, 'All']],
             language: { search: '', searchPlaceholder: 'Search pick lists…', emptyTable: 'No pick lists available.' },
-            columnDefs: [{ orderable: false, targets: [0, 8] }],
+            columnDefs: [
+                { orderable: false, targets: [0, 10] },
+                { type: 'string', targets: 8 },
+            ],
         });
     }
 });

@@ -70,6 +70,7 @@ class IssueController extends Controller
         $requestIds = $request->input('request_id', []);
         $qtyInputs  = $request->input('qty', []);
         $unitInputs = $request->input('unit_id', []);
+        $requisitionUnit = $this->normalizeRequisitionUnit($request->input('requisition_unit'));
 
         if (empty($requestIds)) {
             return back()->with('message_error', 'No items selected to issue.');
@@ -202,6 +203,7 @@ class IssueController extends Controller
                 'allocations'             => $allocations,
                 'use_satellite_inventory' => $useSatelliteInventory,
                 'unit_id'                 => $issueUnitId > 0 ? $issueUnitId : null,
+                'requisition_unit'        => $useSatelliteInventory ? $requisitionUnit : null,
             ];
         }
 
@@ -236,6 +238,7 @@ class IssueController extends Controller
                                 'stock_id'                   => $receipt->stock_id,
                                 'item_id'                    => $receipt->item_id,
                                 'unit_id'                    => $plan['unit_id'] ?? $itemRequest->itemname->unit_id ?? null,
+                                'requisition_unit'           => $plan['requisition_unit'] ?? null,
                                 'batch_number'               => $receipt->batch_number,
                                 'qty_requested'              => $itemRequest->qty ?? $itemRequest->qty_requested,
                                 'qty'                        => $qtyToTake,
@@ -500,5 +503,20 @@ class IssueController extends Controller
     private function allocatedTotal(array $allocations): int
     {
         return array_sum(array_column($allocations, 'qty'));
+    }
+
+    private function normalizeRequisitionUnit(mixed $value): ?string
+    {
+        if (! is_string($value) && ! is_numeric($value)) {
+            return null;
+        }
+
+        $unit = trim((string) $value);
+
+        if ($unit === '') {
+            return null;
+        }
+
+        return mb_substr($unit, 0, 100);
     }
 }

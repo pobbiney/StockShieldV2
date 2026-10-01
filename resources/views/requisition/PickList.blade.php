@@ -347,9 +347,9 @@
                                         {{ optional($lists->storename)->name ?? 'Store' }}
                                     </span>
                                 </td>
-                                <td>
-                                    {{ optional($lists->updated_at)->format('M d, Y') ?? '—' }}
-                                    <div class="text-muted small">{{ optional($lists->updated_at)->format('h:i A') }}</div>
+                                <td data-order="{{ optional($lists->issued_at ?? $lists->updated_at)->format('Y-m-d H:i:s') ?? '' }}">
+                                    {{ optional($lists->issued_at ?? $lists->updated_at)->format('M d, Y') ?? '—' }}
+                                    <div class="text-muted small">{{ optional($lists->issued_at ?? $lists->updated_at)->format('h:i A') }}</div>
                                 </td>
                                 <td>
                                     <span class="status-badge">
@@ -397,7 +397,10 @@ $(document).ready(function () {
             pageLength: 15,
             lengthMenu: [[10, 15, 25, 50, -1], [10, 15, 25, 50, 'All']],
             language: { search: '', searchPlaceholder: 'Search pick lists…' },
-            columnDefs: [{ orderable: false, targets: [0, 7] }],
+            columnDefs: [
+                { orderable: false, targets: [0, 7] },
+                { type: 'string', targets: 5 },
+            ],
         });
     }
 });

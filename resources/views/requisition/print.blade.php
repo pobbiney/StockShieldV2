@@ -235,6 +235,14 @@ thead th:last-child { padding-right: 10px; }
     vertical-align: middle;
   }
 
+  .uom-from-req {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-mute);
+  }
+
  tbody td:first-child { padding-left: 10px; }
 tbody td:last-child { padding-right: 10px; }
 
@@ -571,7 +579,12 @@ tfoot td {
         <td>{{ $loop->iteration}}</td>
         <td> {{ $list->itemcode->item_code }}</td>
         <td>{{ $list->itemname->name }}</td>
-         <td>{{ optional($list->unitname)->name ?? optional(optional($list->itemname)->unitname)->name ?? '—' }}</td>
+         <td>
+           {{ optional($list->unitname)->name ?? optional(optional($list->itemname)->unitname)->name ?? '—' }}
+           @if(!empty($list->requisition_unit))
+             <span class="uom-from-req">From req: {{ $list->requisition_unit }}</span>
+           @endif
+         </td>
         <td>{{ $list->qty }}</td>
       </tr>
       
