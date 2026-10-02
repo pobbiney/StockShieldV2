@@ -195,6 +195,11 @@
         text-transform: capitalize;
     }
 
+    .status-badge.is-received {
+        background: rgba(22, 163, 74, 0.12);
+        color: #15803d;
+    }
+
     .pl-actions {
         display: flex;
         align-items: center;
@@ -273,9 +278,9 @@
                     <div class="pl-hero-badge">
                         <i class="bi bi-clipboard-check"></i> Stock — Pick List
                     </div>
-                    <h2>Ready for Pick Up</h2>
+                    <h2>Issued & Received</h2>
                     <p>
-                        Issued slips waiting to be collected. Open a requisition to review items and print the invoice.
+                        Issued and received slips for your store. Open a requisition to review items and print the invoice.
                         @if($activeStore ?? null)
                             <span class="d-block mt-1 opacity-75"><i class="bi bi-building me-1"></i>{{ $activeStore->name }}</span>
                         @endif
@@ -298,7 +303,7 @@
             <div class="stat-card">
                 <div class="stat-card-icon"><i class="bi bi-truck"></i></div>
                 <div class="stat-card-value">{{ number_format($pickCount) }}</div>
-                <p class="stat-card-label">Pick Lists Ready</p>
+                <p class="stat-card-label">Issued & Received</p>
             </div>
         </div>
     </div>
@@ -306,7 +311,7 @@
     <div class="pl-table-card mb-5">
         <div class="pl-table-head">
             <div>
-                <h5><i class="bi bi-clipboard-check me-1 text-primary"></i> Issued Slips</h5>
+                <h5><i class="bi bi-clipboard-check me-1 text-primary"></i> Issued & Received</h5>
                 <span class="record-count-badge">
                     <i class="bi bi-hourglass-split"></i>
                     {{ $pickCount }} pick list{{ $pickCount !== 1 ? 's' : '' }}
@@ -352,8 +357,13 @@
                                     <div class="text-muted small">{{ optional($lists->issued_at ?? $lists->updated_at)->format('h:i A') }}</div>
                                 </td>
                                 <td>
-                                    <span class="status-badge">
-                                        <i class="bi bi-truck"></i> {{ $lists->status ?? 'issued' }}
+                                    @php
+                                        $pickStatus = strtolower($lists->status ?? 'issued');
+                                        $isReceived = $pickStatus === 'received';
+                                    @endphp
+                                    <span class="status-badge {{ $isReceived ? 'is-received' : '' }}">
+                                        <i class="bi {{ $isReceived ? 'bi-check-circle' : 'bi-truck' }}"></i>
+                                        {{ $pickStatus }}
                                     </span>
                                 </td>
                                 <td>

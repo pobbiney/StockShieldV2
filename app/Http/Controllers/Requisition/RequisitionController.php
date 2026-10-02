@@ -118,7 +118,7 @@ class RequisitionController extends Controller
             'to_store'        => $first->storename,
             'ward_label'      => null,
             'issued_by'       => $first->authorised,
-            'status'          => $first->status ?? 'issued',
+            'status'          => $this->pickListGroupStatus($lines),
             'updated_at'      => $lines->max('updated_at'),
             'line_count'      => $lines->count(),
             'unique_items'    => $lines->pluck('item_id')->unique()->count(),
@@ -144,6 +144,19 @@ class RequisitionController extends Controller
         return $units->join(', ');
     }
 
+    protected function pickListGroupStatus($lines): string
+    {
+        if (collect($lines)->contains(fn ($line) => ($line->status ?? '') === 'issued')) {
+            return 'issued';
+        }
+
+        if (collect($lines)->contains(fn ($line) => ($line->status ?? '') === 'received')) {
+            return 'received';
+        }
+
+        return collect($lines)->first()->status ?? 'issued';
+    }
+
     protected function satellitePickListRows(array $storeIds)
     {
         if (empty($storeIds)) {
@@ -151,7 +164,7 @@ class RequisitionController extends Controller
         }
 
         $lines = SatelliteItemIssue::with(['issuefrom', 'storename', 'authorised'])
-            ->awaitingReceipt();
+            ->issuedOrReceived();
         $this->scopePickListStores($lines, $storeIds);
 
         return $lines
@@ -219,6 +232,7 @@ class RequisitionController extends Controller
                         ? $destinationNames->join(', ')
                         : ($destinationNames->first() ?? '—'),
                     'issued_by'       => $first->issuedByUser,
+                    'status'          => $this->pickListGroupStatus($lines),
                     'line_count'      => $lines->count(),
                     'unique_items'    => $lines->pluck('item_id')->unique()->count(),
                     'total_qty'       => (int) $lines->sum('qty_issued'),
@@ -229,13 +243,13 @@ class RequisitionController extends Controller
 
         $centralTransferLines = ItemIssue::with(['issuefrom', 'staffname', 'authorised'])
             ->where('issue_to', $activeStoreId)
-            ->awaitingReceipt()
+            ->issuedOrReceived()
             ->orderByDesc('updated_at')
             ->get();
 
         $satelliteTransferLines = SatelliteItemIssue::with(['issuefrom', 'staffname', 'authorised', 'storename'])
             ->where('issue_to', $activeStoreId)
-            ->awaitingReceipt()
+            ->issuedOrReceived()
             ->orderByDesc('updated_at')
             ->get();
 
@@ -254,6 +268,7 @@ class RequisitionController extends Controller
                     'to_store'        => $first->storename ?? null,
                     'ward_label'      => null,
                     'issued_by'       => $first->authorised,
+                    'status'          => $this->pickListGroupStatus($lines),
                     'line_count'      => $lines->count(),
                     'unique_items'    => $lines->pluck('item_id')->unique()->count(),
                     'total_qty'       => (int) $lines->sum('qty'),
@@ -265,7 +280,7 @@ class RequisitionController extends Controller
         $outboundSatelliteIssues = SatelliteItemIssue::with(['issuefrom', 'storename', 'authorised'])
             ->where('store_id', $activeStoreId)
             ->where('issue_to', '!=', $activeStoreId)
-            ->awaitingReceipt()
+            ->issuedOrReceived()
             ->orderByDesc('updated_at')
             ->get()
             ->groupBy('requisition_no')
@@ -767,16 +782,22 @@ class RequisitionController extends Controller
 
         $listdept = $this->pickListStoreIds();
 
-        $listrequest = ItemIssue::with(['issuefrom', 'storename'])
-            ->whereIn('id', function ($query) use ($listdept) {
-                $query->selectRaw('MAX(id)')
-                    ->from('item_issues')
-                    ->where('status', 'issued');
-                $this->scopePickListStores($query, $listdept)
-                    ->groupBy('requisition_no');
-            })
+        $centralLines = ItemIssue::with(['issuefrom', 'storename'])
+            ->issuedOrReceived();
+        $this->scopePickListStores($centralLines, $listdept);
+
+        $listrequest = $centralLines
             ->orderByDesc('id')
-            ->get();
+            ->get()
+            ->groupBy('requisition_no')
+            ->map(function ($lines) {
+                $latest = $lines->sortByDesc('id')->first();
+                $latest->status = $this->pickListGroupStatus($lines);
+                $latest->issued_at = $lines->max('updated_at');
+
+                return $latest;
+            })
+            ->values();
 
         $existingReqNos = $listrequest->pluck('requisition_no')->filter()->all();
         $satelliteRows = $this->satellitePickListRows($listdept)
@@ -855,7 +876,7 @@ class RequisitionController extends Controller
                 'authorised',
             ])
                 ->where('requisition_no', $decodeID)
-                ->awaitingReceipt()
+                ->issuedOrReceived()
                 ->where(function ($query) use ($activeStoreId) {
                     $query->where('store_id', $activeStoreId)
                         ->orWhere('issue_to', $activeStoreId);
@@ -887,14 +908,14 @@ class RequisitionController extends Controller
             $listrequest = ItemIssue::with(['itemcode', 'itemname.unitname', 'issuefrom', 'staffname', 'authorised'])
                 ->where('issue_to', $activeStoreId)
                 ->where('requisition_no', $decodeID)
-                ->awaitingReceipt()
+                ->issuedOrReceived()
                 ->orderBy('batch_number')
                 ->orderBy('id')
                 ->get();
 
             if ($listrequest->isEmpty()) {
                 return redirect()->route('PickList')
-                    ->with('message_error', 'Pick list not found or stock has already been received.');
+                    ->with('message_error', 'Pick list not found.');
             }
 
             $first = $listrequest->first();
@@ -924,7 +945,7 @@ class RequisitionController extends Controller
         ]);
         $this->scopePickListStores($centralLines, $listdept)
             ->where('requisition_no', $decodeID)
-            ->where('status', 'issued')
+            ->issuedOrReceived()
             ->orderBy('batch_number')
             ->orderBy('id');
         $centralLines = $centralLines->get();
@@ -940,7 +961,7 @@ class RequisitionController extends Controller
         ]);
         $this->scopePickListStores($satelliteLines, $listdept)
             ->where('requisition_no', $decodeID)
-            ->awaitingReceipt()
+            ->issuedOrReceived()
             ->orderBy('batch_number')
             ->orderBy('id');
         $satelliteLines = $satelliteLines->get();

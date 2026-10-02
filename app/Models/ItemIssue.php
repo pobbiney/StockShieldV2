@@ -39,6 +39,11 @@ protected $fillable = [
         return $query->where('status', 'issued')->where('status_two', 'issued');
     }
 
+    public function scopeIssuedOrReceived($query)
+    {
+        return $query->whereIn('status', ['issued', 'received']);
+    }
+
     /**
      * Issues submitted by the store manager and ready for HOD approval.
      * Requisition-linked lines require item_request status "pending issue".

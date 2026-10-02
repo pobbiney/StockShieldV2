@@ -269,7 +269,6 @@
                                 <th>Qty Requested</th>
                                 <th>Qty Approved</th>
                                 <th>Available Qty</th>
-                                <th>Total Qty</th>
                                 <th>Qty to Issue</th>
                                 <th>Requested By</th>
                                 <th class="text-end">Action</th>
@@ -338,19 +337,6 @@
                                                     @endif
                                                 </div>
                                             @endif
-                                        @endif
-                                    </td>
-                                    <td>
-                                        @if($avail['expired_only'])
-                                            <span class="text-muted">—</span>
-                                        @elseif(!empty($avail['total_qty_multiplier']))
-                                            <span class="avail-badge ok">{{ number_format($avail['available_effective_qty']) }}</span>
-                                            <div class="batch-hint">
-                                                {{ number_format($avail['available_qty']) }} × {{ number_format($avail['total_qty_multiplier']) }}
-                                            </div>
-                                        @else
-                                            <span class="avail-badge {{ $availClass }}">{{ number_format($avail['available_qty']) }}</span>
-                                            <div class="batch-hint text-secondary">Same as stock qty</div>
                                         @endif
                                     </td>
                                     <td>

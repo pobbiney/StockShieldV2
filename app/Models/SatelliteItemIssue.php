@@ -40,6 +40,11 @@ class SatelliteItemIssue extends Model
         return $query->where('status', 'issued')->where('status_two', 'issued');
     }
 
+    public function scopeIssuedOrReceived($query)
+    {
+        return $query->whereIn('status', ['issued', 'received']);
+    }
+
     public function scopeSubmittedForHodApproval($query)
     {
         return $query->where('status', 'pending')

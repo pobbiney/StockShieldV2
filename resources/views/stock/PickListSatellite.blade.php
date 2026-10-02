@@ -194,6 +194,12 @@
         font-weight: 600;
         background: rgba(59, 130, 246, 0.12);
         color: #2563eb;
+        text-transform: capitalize;
+    }
+
+    .status-badge.is-received {
+        background: rgba(22, 163, 74, 0.12);
+        color: #15803d;
     }
 
     .pl-actions {
@@ -281,9 +287,9 @@
                     <div class="pl-hero-badge">
                         <i class="bi bi-truck"></i> Satellite Store — Pick List
                     </div>
-                    <h2>Ready for Pick Up</h2>
+                    <h2>Issued & Received</h2>
                     <p>
-                        View and print items issued from your satellite store to wards or other stores, and transfers awaiting pick-up.
+                        View and print issued and received items from your satellite store to wards or other stores, plus inbound transfers.
                         @if($activeStore ?? null)
                             <span class="d-block mt-1 opacity-75"><i class="bi bi-building me-1"></i>{{ $activeStore->name }}</span>
                         @endif
@@ -306,7 +312,7 @@
             <div class="stat-card req">
                 <div class="stat-card-icon"><i class="bi bi-truck"></i></div>
                 <div class="stat-card-value">{{ number_format($totalPickLists ?? 0) }}</div>
-                <p class="stat-card-label">Issued Slips Ready</p>
+                <p class="stat-card-label">Issued & Received</p>
             </div>
         </div>
         <div class="col-sm-4">
@@ -328,7 +334,7 @@
     <div class="pl-table-card mb-5">
         <div class="pl-table-head">
             <div>
-                <h5><i class="bi bi-clipboard-check me-1 text-warning"></i> Ready for Pick Up</h5>
+                <h5><i class="bi bi-clipboard-check me-1 text-warning"></i> Issued & Received</h5>
                 <span class="record-count-badge">
                     <i class="bi bi-hourglass-split"></i>
                     {{ $totalPickLists ?? 0 }} pick list{{ ($totalPickLists ?? 0) !== 1 ? 's' : '' }}
@@ -407,8 +413,13 @@
                                     <div class="text-muted small">{{ $pick->issued_at?->format('h:i A') }}</div>
                                 </td>
                                 <td>
-                                    <span class="status-badge">
-                                        <i class="bi bi-truck"></i> Ready to Pick
+                                    @php
+                                        $pickStatus = strtolower($pick->status ?? 'issued');
+                                        $isReceived = $pickStatus === 'received';
+                                    @endphp
+                                    <span class="status-badge {{ $isReceived ? 'is-received' : '' }}">
+                                        <i class="bi {{ $isReceived ? 'bi-check-circle' : 'bi-truck' }}"></i>
+                                        {{ $pickStatus }}
                                     </span>
                                 </td>
                                 <td>
