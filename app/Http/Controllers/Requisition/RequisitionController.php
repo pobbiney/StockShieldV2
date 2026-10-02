@@ -329,12 +329,10 @@ class RequisitionController extends Controller
 
     public function addRequest(Request $request)
     {
-        $allowedStoreIds = Store::requestFromStores()->pluck('id')->map(fn ($id) => (int) $id)->all();
-
         $request->validate([
             'item'           => 'required|integer|exists:items,id',
             'quantity'       => 'required|numeric|min:1',
-            'item_store_id'  => ['required', 'integer', 'in:' . implode(',', $allowedStoreIds ?: [0])],
+            'item_store_id'  => 'nullable|integer',
         ]);
 
         $activeStoreId = $this->resolveActiveStoreId();
@@ -352,16 +350,14 @@ class RequisitionController extends Controller
             );
         }
 
-        $fulfillmentStore = Store::find((int) $request->item_store_id);
-
-        if (!$fulfillmentStore) {
-            return redirect()->route('Requisition')->with(
-                'message_error',
-                'Select the store you are requesting from.'
-            );
-        }
+        $requesting = Store::find($activeStoreId);
 
         try {
+            $fulfillmentStore = $this->resolveFulfillmentStore(
+                $requesting,
+                $item,
+                $request->filled('item_store_id') ? (int) $request->item_store_id : null
+            );
             $lineMeta = $this->requisitionFulfillment->resolveLineMetadataForFulfillmentStore($fulfillmentStore, $item);
         } catch (RuntimeException $e) {
             return redirect()->route('Requisition')->with('message_error', $e->getMessage());
@@ -384,6 +380,116 @@ class RequisitionController extends Controller
         }
 
         return redirect()->route('Requisition')->with('message_success', 'Item added to your requisition draft.');
+    }
+
+    public function updateRequest(Request $request)
+    {
+        $request->validate([
+            'request_id'     => 'required|integer',
+            'item'           => 'required|integer|exists:items,id',
+            'quantity'       => 'required|numeric|min:1',
+            'item_store_id'  => 'nullable|integer',
+        ]);
+
+        $activeStoreId = $this->resolveActiveStoreId();
+
+        if (!$activeStoreId) {
+            return redirect()->route('choose-store');
+        }
+
+        $line = ItemRequest::where('id', (int) $request->request_id)
+            ->where('store_id', $activeStoreId)
+            ->where('status', 'pending')
+            ->first();
+
+        if (!$line) {
+            return redirect()->route('Requisition')->with(
+                'message_error',
+                'Draft item not found or can no longer be edited.'
+            );
+        }
+
+        $item = Item::find((int) $request->item);
+
+        if (!$item || $item->status !== 'Active') {
+            return redirect()->route('Requisition')->with(
+                'message_error',
+                'Selected item is not available for requisition.'
+            );
+        }
+
+        $requesting = Store::find($activeStoreId);
+
+        try {
+            $fulfillmentStore = $this->resolveFulfillmentStore(
+                $requesting,
+                $item,
+                $request->filled('item_store_id') ? (int) $request->item_store_id : null
+            );
+            $lineMeta = $this->requisitionFulfillment->resolveLineMetadataForFulfillmentStore($fulfillmentStore, $item);
+        } catch (RuntimeException $e) {
+            return redirect()->route('Requisition')->with('message_error', $e->getMessage());
+        }
+
+        $line->update([
+            'stock_id'      => $lineMeta['stock_id'],
+            'item_id'       => $item->id,
+            'batch_number'  => $lineMeta['batch_number'],
+            'qty_requested' => (int) $request->quantity,
+            'amount'        => $lineMeta['amount'],
+            'item_store_id' => $lineMeta['item_store_id'],
+        ]);
+
+        return redirect()->route('Requisition')->with('message_success', 'Draft item updated.');
+    }
+
+    public function fulfillmentOptions(Request $request)
+    {
+        $request->validate([
+            'item' => 'required|integer|exists:items,id',
+        ]);
+
+        $activeStoreId = $this->resolveActiveStoreId();
+
+        if (!$activeStoreId) {
+            return response()->json(['message_error' => 'Select a store first.'], 422);
+        }
+
+        $item = Item::find((int) $request->item);
+        $requesting = Store::find($activeStoreId);
+
+        if (!$item || !$requesting) {
+            return response()->json(['message_error' => 'Item or store not found.'], 422);
+        }
+
+        try {
+            return response()->json($this->requisitionFulfillment->fulfillmentChoices($requesting, $item));
+        } catch (RuntimeException $e) {
+            return response()->json(['message_error' => $e->getMessage()], 422);
+        }
+    }
+
+    protected function resolveFulfillmentStore(Store $requesting, Item $item, ?int $postedStoreId): Store
+    {
+        $choices = $this->requisitionFulfillment->fulfillmentChoices($requesting, $item);
+
+        if ($choices['show_dropdown']) {
+            $allowedIds = collect($choices['stores'])->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+            if (!$postedStoreId || !in_array($postedStoreId, $allowedIds, true)) {
+                throw new RuntimeException('Select the store you are requesting from.');
+            }
+
+            $store = Store::find($postedStoreId);
+        } else {
+            $store = Store::find($choices['auto_store_id']);
+        }
+
+        if (!$store) {
+            throw new RuntimeException('Could not determine the store to request from.');
+        }
+
+        return $store;
     }
 
     public function deleteitemRequest(string $id)

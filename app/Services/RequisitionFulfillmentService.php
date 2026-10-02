@@ -193,6 +193,102 @@ class RequisitionFulfillmentService
         ];
     }
 
+    /**
+     * @return array{show_dropdown: bool, stores: array<int, array{id: int, name: string}>, auto_store_id: int|null}
+     */
+    public function fulfillmentChoices(Store $requesting, Item $item): array
+    {
+        $mode = $this->routingMode($requesting);
+        $hub = $this->hubStore();
+
+        if ($mode === 'hub') {
+            if (! $hub) {
+                throw new RuntimeException(
+                    'This store is configured to route requisitions to the hub, but no requisition hub store is set in Settings.'
+                );
+            }
+
+            return [
+                'show_dropdown' => false,
+                'stores'        => [['id' => (int) $hub->id, 'name' => $hub->name]],
+                'auto_store_id' => (int) $hub->id,
+            ];
+        }
+
+        if ($mode === 'central') {
+            $meta = $this->resolveLineMetadata($requesting, $item);
+            $autoId = (int) $meta['item_store_id'];
+            $store = Store::find($autoId);
+
+            return [
+                'show_dropdown' => false,
+                'stores'        => $store ? [['id' => $autoId, 'name' => $store->name]] : [],
+                'auto_store_id' => $autoId ?: null,
+            ];
+        }
+
+        $hubHasStock = $hub && $this->satelliteIssue->availableQty((int) $item->id, (int) $hub->id) > 0;
+        $centralStores = $this->centralStoresWithStock((int) $item->id);
+
+        $stores = [];
+        if ($hubHasStock && $hub) {
+            $stores[] = ['id' => (int) $hub->id, 'name' => $hub->name];
+        }
+        foreach ($centralStores as $store) {
+            $stores[] = ['id' => (int) $store->id, 'name' => $store->name];
+        }
+
+        $showDropdown = $hubHasStock && $centralStores->isNotEmpty();
+
+        $autoStoreId = null;
+        if (! $showDropdown) {
+            if ($hubHasStock && $hub) {
+                $autoStoreId = (int) $hub->id;
+            } elseif ($centralStores->count() === 1) {
+                $autoStoreId = (int) $centralStores->first()->id;
+            } else {
+                $autoStoreId = (int) $this->resolveLineMetadata($requesting, $item)['item_store_id'];
+            }
+        }
+
+        return [
+            'show_dropdown' => $showDropdown,
+            'stores'        => $stores,
+            'auto_store_id' => $autoStoreId,
+        ];
+    }
+
+    protected function centralStoresWithStock(int $itemId)
+    {
+        $centralIds = Store::where('store_group', 'central')
+            ->where('status', 'Active')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (empty($centralIds)) {
+            return collect();
+        }
+
+        $stockedIds = DB::table('approve_stocks')
+            ->where('item_id', $itemId)
+            ->whereIn('store_id', $centralIds)
+            ->where('qty', '>', 0)
+            ->where('status', 'approved')
+            ->whereDate('expiry_date', '>=', now())
+            ->pluck('store_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($stockedIds)) {
+            return collect();
+        }
+
+        return Store::whereIn('id', $stockedIds)->orderBy('name')->get();
+    }
+
     public function fulfillmentLabelForRequestingStore(Store $requesting): string
     {
         $mode = $this->routingMode($requesting);

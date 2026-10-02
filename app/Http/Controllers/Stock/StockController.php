@@ -1236,7 +1236,7 @@ class StockController extends Controller
 
     public function getIssueItemView()
     {
-        $storeIds = $this->storeContext->getScopedStoreIds();
+        $storeIds = $this->storeContext->getLoginStoreIds();
 
         if (empty($storeIds)) {
             return redirect()->route('choose-store');
@@ -1247,7 +1247,7 @@ class StockController extends Controller
         }
 
         $approvedRequests = ItemRequest::with(['storename', 'staffname', 'itemname'])
-            ->approvedForIssuingStores($storeIds, $this->storeContext->hasGlobalStoreAccess())
+            ->approvedForIssuingStores($storeIds)
             ->orderByDesc('created_at')
             ->get();
 

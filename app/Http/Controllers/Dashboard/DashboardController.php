@@ -80,7 +80,7 @@ class DashboardController extends Controller implements HasMiddleware
 
         if ($isCentralStore && !empty($fulfillStoreIds)) {
             $approvedRequests = ItemRequest::with(['storename', 'staffname'])
-                ->approvedForIssuingStores($fulfillStoreIds, $storeContext->hasGlobalStoreAccess())
+                ->approvedForIssuingStores($fulfillStoreIds)
                 ->orderByDesc('created_at')
                 ->get();
 

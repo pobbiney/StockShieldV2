@@ -33,6 +33,27 @@ class StoreContext
         return $category && (bool) $category->access_all_stores;
     }
 
+    /**
+     * Store IDs for the logged-in session: the chosen active store,
+     * otherwise the stores mapped on the user record.
+     */
+    public function getLoginStoreIds(?User $user = null): array
+    {
+        $user = $user ?? auth()->user();
+
+        if (!$user) {
+            return [];
+        }
+
+        $activeStoreId = $this->getActiveStoreId();
+
+        if ($activeStoreId && $this->canAccessStore($user, $activeStoreId)) {
+            return [$activeStoreId];
+        }
+
+        return $this->getMappedStoreIds($user);
+    }
+
     public function getActiveStoreId(): ?int
     {
         $activeStoreId = session('active_store_id');

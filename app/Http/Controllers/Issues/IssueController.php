@@ -31,12 +31,12 @@ class IssueController extends Controller
 
     public function getviewStoreRequest($requisition_no)
     {
-        $storeIds = $this->storeContext->getScopedStoreIds();
+        $storeIds = $this->storeContext->getLoginStoreIds();
         $decodeID = Crypt::decrypt($requisition_no);
 
         $listrequest = ItemRequest::with(['itemcode', 'itemname.unitname', 'storename', 'staffname', 'sourceStore'])
             ->where('requisition_no', $decodeID)
-            ->approvedForIssuingStores($storeIds, $this->storeContext->hasGlobalStoreAccess())
+            ->approvedForIssuingStores($storeIds)
             ->orderByDesc('id')
             ->get();
 
@@ -76,10 +76,10 @@ class IssueController extends Controller
             return back()->with('message_error', 'No items selected to issue.');
         }
 
-        $storeIds = $this->storeContext->getScopedStoreIds();
+        $storeIds = $this->storeContext->getLoginStoreIds();
         $itemRequests = ItemRequest::with('itemname')
             ->whereIn('id', $requestIds)
-            ->approvedForIssuingStores($storeIds, $this->storeContext->hasGlobalStoreAccess())
+            ->approvedForIssuingStores($storeIds)
             ->get()
             ->keyBy('id');
 

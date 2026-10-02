@@ -69,26 +69,24 @@ class ItemRequest extends Model
     }
 
     /**
-     * Approved lines this store should issue: assigned here or owned
-     * by this store in the item catalogue. Other stores' lines on the
-     * same requisition number are excluded.
+     * Approved lines this store should issue. Only lines assigned to the
+     * logged-in store (item_store_id) are included.
      */
     public function scopeApprovedForIssuingStores($query, array $storeIds, bool $hasGlobalAccess = false)
     {
         $query->where('status', 'request approved');
 
-        if ($hasGlobalAccess || empty($storeIds)) {
+        $storeIds = array_values(array_unique(array_map('intval', $storeIds)));
+
+        if ($hasGlobalAccess && empty($storeIds)) {
             return $query;
         }
 
-        $storeIds = array_values(array_unique(array_map('intval', $storeIds)));
+        if (empty($storeIds)) {
+            return $query->whereRaw('0 = 1');
+        }
 
-        return $query->where(function ($match) use ($storeIds) {
-            $match->whereIn('item_store_id', $storeIds)
-                ->orWhereHas('itemname', function ($item) use ($storeIds) {
-                    $item->whereIn('store_id', $storeIds);
-                });
-        });
+        return $query->whereIn('item_store_id', $storeIds);
     }
 
     public function approvedQuantity(): ?int

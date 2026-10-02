@@ -284,6 +284,8 @@ Route::get('/issued-item-byitemDepartDate-print',[ReportController::class, 'prin
 
 Route::get('Requisition',[RequisitionController::class,'getRequisitionView'])->name('Requisition'); 
 Route::post('add-request-process',[RequisitionController::class,'addRequest'])->name('add-request-process');
+Route::post('update-request-process',[RequisitionController::class,'updateRequest'])->name('update-request-process');
+Route::post('requisition-fulfillment-options',[RequisitionController::class,'fulfillmentOptions'])->name('requisition.fulfillment-options');
 Route::get('Requisition/{id}/delete', [RequisitionController::class, 'deleteitemRequest']);
  
 Route::get('/submit-all-requests', [RequisitionController::class, 'submitRequest'])

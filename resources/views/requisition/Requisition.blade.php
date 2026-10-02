@@ -464,6 +464,94 @@
         transform: scale(1.08);
     }
 
+    .req-line-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .btn-edit-req {
+        width: 34px;
+        height: 34px;
+        border-radius: 0.5rem;
+        border: 1.5px solid #e2e8f0;
+        background: #fff;
+        color: #0d6efd;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .btn-edit-req:hover {
+        background: #0d6efd;
+        color: #fff;
+        transform: scale(1.08);
+    }
+
+    .edit-req-modal .modal-content {
+        border-radius: 1.25rem;
+        border: none;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+    }
+
+    .edit-req-modal .modal-header {
+        background: linear-gradient(135deg, #1e3a5f 0%, #0d6efd 100%);
+        color: #fff;
+        border: none;
+        padding: 1.25rem 1.5rem;
+    }
+
+    .edit-req-modal .modal-header .modal-title {
+        font-family: "SUSE", sans-serif;
+        font-weight: 700;
+        font-size: 1.05rem;
+    }
+
+    .edit-req-modal .modal-header .btn-close {
+        filter: invert(1) grayscale(1) brightness(2);
+    }
+
+    .edit-req-modal .modal-body { padding: 1.35rem 1.5rem; overflow: visible; }
+
+    .edit-req-modal .modal-footer {
+        border-top: 1px solid #f1f5f9;
+        padding: 1rem 1.5rem;
+        background: #f8fafc;
+        gap: 0.5rem;
+    }
+
+    .btn-save-edit {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.55rem 1.15rem;
+        border-radius: 0.625rem;
+        border: none;
+        background: #0d6efd;
+        color: #fff;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .btn-save-edit:hover { background: #0b5ed7; color: #fff; }
+
+    .btn-modal-clear {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.55rem 1.15rem;
+        border-radius: 0.625rem;
+        border: 1.5px solid #e2e8f0;
+        background: #fff;
+        color: #64748b;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .btn-modal-clear:hover { background: #f8fafc; color: #334155; }
+
     .req-empty {
         text-align: center;
         padding: 3rem 2rem;
@@ -687,7 +775,7 @@
                         @endif
                     </div>
                     <h2>Request Stock</h2>
-                    <p>Choose the store you are requesting from — central stores or Admin Store — Satellite — then add items to your draft.</p>
+                    <p>Search for an item and add it to your draft. The request is sent to the mapped store automatically, unless the item is held at both the hub and a central store.</p>
                     @if($activeStore)
                     <div class="store-context-banner">
                         <span class="store-chip"><i class="bi bi-shop"></i> {{ $activeStore->name }}</span>
@@ -772,18 +860,13 @@
                         @error('item') <small class="text-danger">{{ $message }}</small> @enderror
                         <div class="field-hint">Click the field or type to search all items</div>
                     </div>
-                    <div class="col-lg-3">
+                    <div class="col-lg-3 req-from-wrap" id="reqFromWrap" hidden>
                         <label class="form-label" for="item_store_id">Request from</label>
-                        <select class="form-select" name="item_store_id" id="item_store_id" required>
+                        <select class="form-select" name="item_store_id" id="item_store_id">
                             <option value="">Select store…</option>
-                            @foreach(($requestFromStores ?? $centralStores ?? collect()) as $fromStore)
-                                <option value="{{ $fromStore->id }}" @selected((string) old('item_store_id') === (string) $fromStore->id)>
-                                    {{ $fromStore->name }}
-                                </option>
-                            @endforeach
                         </select>
                         @error('item_store_id') <small class="text-danger">{{ $message }}</small> @enderror
-                        <div class="field-hint">Central stores or Admin Store — Satellite</div>
+                        <div class="field-hint">Item is in both hub and central — choose one</div>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label">UoM</label>
@@ -856,13 +939,27 @@
                                 <td class="qty-cell"><span class="qty-issued zero">0</span></td>
                                 <td><span class="status-badge draft"><i class="bi bi-pencil"></i> Draft</span></td>
                                 <td>
-                                    <button type="button"
-                                            class="btn-delete-req btn-confirm-delete"
-                                            title="Remove item"
-                                            data-delete-url="{{ url('Requisition/'.$lists->id.'/delete') }}"
-                                            data-item-name="{{ $lists->itemname->name ?? 'this item' }}">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                    <div class="req-line-actions">
+                                        <button type="button"
+                                                class="btn-edit-req btn-open-edit"
+                                                title="Edit item"
+                                                data-id="{{ $lists->id }}"
+                                                data-item-id="{{ $lists->item_id }}"
+                                                data-item-name="{{ $lists->itemname->name ?? '' }}"
+                                                data-item-code="{{ $lists->itemcode->item_code ?? '' }}"
+                                                data-store-id="{{ $lists->item_store_id }}"
+                                                data-qty="{{ $lists->qty_requested }}"
+                                                data-uom="{{ $lists->itemname->unitname->name ?? '' }}">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                        <button type="button"
+                                                class="btn-delete-req btn-confirm-delete"
+                                                title="Remove item"
+                                                data-delete-url="{{ url('Requisition/'.$lists->id.'/delete') }}"
+                                                data-item-name="{{ $lists->itemname->name ?? 'this item' }}">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
@@ -889,6 +986,64 @@
 </div>
 
 <form id="deleteRequestForm" method="GET" action="" class="d-none"></form>
+
+<div class="modal fade edit-req-modal" id="editRequestModal" tabindex="-1" aria-labelledby="editRequestModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form method="post" action="{{ route('update-request-process') }}" id="editRequestForm">
+                @csrf
+                <input type="hidden" name="request_id" id="edit_request_id">
+                <div class="modal-header">
+                    <h5 class="modal-title d-flex align-items-center gap-2" id="editRequestModalLabel">
+                        <i class="bi bi-pencil-square"></i> Edit draft item
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Correct the item or quantity before submitting the draft.</p>
+                    <div class="row g-3">
+                        <div class="col-lg-6">
+                            <label class="form-label" for="edit_item_search">Item</label>
+                            <div class="item-autocomplete" id="editItemAutocomplete">
+                                <div class="item-autocomplete-input-wrap">
+                                    <i class="bi bi-search item-autocomplete-icon"></i>
+                                    <input type="text"
+                                           class="form-control item-autocomplete-input"
+                                           id="edit_item_search"
+                                           placeholder="Start typing item name or code…"
+                                           autocomplete="off">
+                                    <button type="button" class="item-autocomplete-clear" aria-label="Clear item">&times;</button>
+                                </div>
+                                <input type="hidden" name="item" id="edit_item_id">
+                                <ul class="item-autocomplete-list" id="edit_item_list" role="listbox" hidden></ul>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 req-from-wrap" id="editFromWrap" hidden>
+                            <label class="form-label" for="edit_item_store_id">Request from</label>
+                            <select class="form-select" name="item_store_id" id="edit_item_store_id">
+                                <option value="">Select store…</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">UoM</label>
+                            <input type="text" id="edit_uom" class="form-control" readonly placeholder="—">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Quantity</label>
+                            <input type="number" class="form-control" name="quantity" id="edit_quantity" min="1" required placeholder="Qty">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-clear" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn-save-edit">
+                        <i class="bi bi-check-lg"></i> Save changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 @endsection
 
@@ -1059,10 +1214,26 @@ ItemAutocomplete.prototype.clear = function (focusInput) {
     this.hidden.value = '';
     this.root.classList.remove('has-value');
     this.closeList();
-    $('#uom').val('');
-    $('#stock_hint').text('');
+    this.syncAddFormUom('');
+    this.clearFulfillmentChoice();
     if (focusInput !== false) {
         this.input.focus();
+    }
+};
+
+ItemAutocomplete.prototype.clearFulfillmentChoice = function () {
+    if (this.root && this.root.id === 'reqItemAutocomplete') {
+        resetFulfillmentSelect('#reqFromWrap', '#item_store_id');
+    }
+    if (this.root && this.root.id === 'editItemAutocomplete') {
+        resetFulfillmentSelect('#editFromWrap', '#edit_item_store_id');
+    }
+};
+
+ItemAutocomplete.prototype.syncAddFormUom = function (value) {
+    if (this.root && this.root.id === 'reqItemAutocomplete') {
+        $('#uom').val(value || '');
+        $('#stock_hint').text('');
     }
 };
 
@@ -1088,8 +1259,8 @@ ItemAutocomplete.prototype.onInput = function () {
         this.selectedItem = null;
         this.hidden.value = '';
         this.root.classList.remove('has-value');
-        $('#uom').val('');
-        $('#stock_hint').text('');
+        this.syncAddFormUom('');
+        this.clearFulfillmentChoice();
     }
     if (!term.trim()) {
         this.render(this.filter(''));
@@ -1168,6 +1339,43 @@ function loadStockForItem(itemId) {
 }
 
 let reqItemAutocomplete;
+let editItemAutocomplete;
+
+function resetFulfillmentSelect(wrapSel, selectSel) {
+    const wrap = $(wrapSel);
+    const select = $(selectSel);
+    wrap.prop('hidden', true);
+    select.empty().append($('<option>', { value: '', text: 'Select store…' })).prop('required', false).val('');
+}
+
+function applyFulfillmentOptions(wrapSel, selectSel, itemId, preferredId) {
+    resetFulfillmentSelect(wrapSel, selectSel);
+
+    if (!itemId) {
+        return;
+    }
+
+    $.ajax({
+        url: @json(route('requisition.fulfillment-options')),
+        type: 'POST',
+        data: { item: itemId, _token: @json(csrf_token()) },
+        success: function (data) {
+            if (!data || !data.show_dropdown || !data.stores || !data.stores.length) {
+                return;
+            }
+
+            const select = $(selectSel);
+            data.stores.forEach(function (store) {
+                select.append($('<option>', { value: store.id, text: store.name }));
+            });
+            $(wrapSel).prop('hidden', false);
+            select.prop('required', true);
+            if (preferredId) {
+                select.val(String(preferredId));
+            }
+        },
+    });
+}
 
 $(document).ready(function () {
     reqItemAutocomplete = new ItemAutocomplete(
@@ -1175,12 +1383,26 @@ $(document).ready(function () {
         REQ_ITEMS,
         function (item) {
             loadStockForItem(item.id);
+            applyFulfillmentOptions('#reqFromWrap', '#item_store_id', item.id);
         }
     );
 
     if (reqItemAutocomplete.hidden.value) {
         reqItemAutocomplete.root.classList.add('has-value');
         loadStockForItem(reqItemAutocomplete.hidden.value);
+        applyFulfillmentOptions('#reqFromWrap', '#item_store_id', reqItemAutocomplete.hidden.value, @json(old('item_store_id')));
+    }
+
+    const editRoot = document.getElementById('editItemAutocomplete');
+    if (editRoot) {
+        editItemAutocomplete = new ItemAutocomplete(
+            editRoot,
+            REQ_ITEMS,
+            function (item) {
+                $('#edit_uom').val(item.uom || '');
+                applyFulfillmentOptions('#editFromWrap', '#edit_item_store_id', item.id);
+            }
+        );
     }
 
     $('#addRequestForm').on('submit', function (e) {
@@ -1191,11 +1413,45 @@ $(document).ready(function () {
             return;
         }
 
-        if (!$('#item_store_id').val()) {
+        if (!$('#reqFromWrap').prop('hidden') && !$('#item_store_id').val()) {
             e.preventDefault();
             ReqAlert.error('Store Required', 'Please select the store you are requesting from.');
             $('#item_store_id').focus();
         }
+    });
+
+    $('#editRequestForm').on('submit', function (e) {
+        if (!$('#edit_item_id').val()) {
+            e.preventDefault();
+            ReqAlert.error('Item Required', 'Please search and select an item from the list.');
+            $('#edit_item_search').focus();
+            return;
+        }
+
+        if (!$('#editFromWrap').prop('hidden') && !$('#edit_item_store_id').val()) {
+            e.preventDefault();
+            ReqAlert.error('Store Required', 'Please select the store you are requesting from.');
+            $('#edit_item_store_id').focus();
+        }
+    });
+
+    $('.btn-open-edit').on('click', function () {
+        const btn = $(this);
+        const itemId = btn.data('item-id');
+        const storeId = btn.data('store-id');
+        $('#edit_request_id').val(btn.data('id'));
+        $('#edit_quantity').val(btn.data('qty'));
+        $('#edit_uom').val(btn.data('uom') || '');
+
+        if (editItemAutocomplete && itemId) {
+            editItemAutocomplete.setById(itemId);
+        }
+        if (!$('#edit_uom').val()) {
+            $('#edit_uom').val(btn.data('uom') || '');
+        }
+
+        applyFulfillmentOptions('#editFromWrap', '#edit_item_store_id', itemId, storeId);
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('editRequestModal')).show();
     });
 });
 
